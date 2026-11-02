@@ -13,10 +13,12 @@ S.defaults = {
     features = {
         pvp = true, gold = true, dungeons = true, playtime = true,
         dungeonHelper = true, whisperIcon = true, inviteIcon = true,
-        zoneNotify = true, events = true,
+        zoneNotify = true, events = true, campSOS = true,
     },
     zoneCooldown = 30,      -- minutos entre avisos de la misma zona
     eventReminder = 10,     -- minutos de antelación del aviso de evento
+    campDeaths = 2,         -- muertes a manos de enemigos para considerar campeo...
+    campWindow = 10,        -- ...dentro de estos minutos
     dhBelow = 2,            -- niveles por debajo del nivel de desbloqueo
     dhAbove = 4,            -- niveles por encima que aún "renta"
     dhMaxLevel = 59,        -- a partir de 60 se desactiva el ayudante

@@ -9,13 +9,13 @@ SG.UI = UI
 
 local frame, tabs, panels, current = nil, {}, {}, nil
 local SKULL = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_8:12:12|t"
-local STAR  = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:12:12|t"
+local CROWN = "Interface\\GroupFrame\\UI-Group-LeaderIcon"
 local CHECK = "|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t"
 local TAB_ORDER = {
     { key = "profile",  text = "Perfil" },
     { key = "pvp",      text = "PvP" },
+    { key = "dungeons", text = "PvE" },
     { key = "gold",     text = "Oro" },
-    { key = "dungeons", text = "Mazmorras" },
     { key = "playtime", text = "Tiempo" },
     { key = "events",   text = "Eventos" },
     { key = "admin",    text = "GM" },
@@ -24,22 +24,8 @@ local TAB_ORDER = {
 ---------------------------------------------------------------------------
 -- Helpers de ranking
 ---------------------------------------------------------------------------
-local function altTooltip(acc, field, formatter)
-    local lines = { SG:ColoredMain(acc) }
-    local arr = {}
-    for name, c in pairs(acc.chars) do arr[#arr + 1] = { name = name, c = c } end
-    table.sort(arr, function(a, b) return a.name < b.name end)
-    for _, it in ipairs(arr) do
-        local c = it.c
-        local v = field and formatter and formatter(c) or ""
-        local tag = (it.name == acc.main) and " |cffffd100(main)|r" or ""
-        if c.manual then tag = tag .. " |cff888888(sin datos)|r" end
-        lines[#lines + 1] = SG:ClassColor(c.class) .. it.name .. "|r" .. (c.level and (" " .. c.level) or "") .. tag .. "   " .. v
-    end
-    return lines
-end
-
-local function rankingRows(list, formatter, perChar)
+-- Cada jugador sale solo con su main, que engloba las estadísticas de todos sus personajes
+local function rankingRows(list, formatter)
     local rows = {}
     for i, it in ipairs(list) do
         local medal = (i == 1 and "|cffffd700") or (i == 2 and "|cffc0c0c0") or (i == 3 and "|cffcd7f32") or "|cffaaaaaa"
@@ -47,7 +33,6 @@ local function rankingRows(list, formatter, perChar)
             text = medal .. i .. ".|r  " .. SG:ColoredMain(it.acc)
                 .. (it.acc.mine and " |cff88ff88(tú)|r" or ""),
             right = formatter(it.value),
-            tooltip = altTooltip(it.acc, true, perChar),
         }
     end
     if #rows == 0 then rows[1] = { text = "|cff888888Aún no hay datos. ¡Sal ahí fuera!|r" } end
@@ -62,9 +47,12 @@ local function makeRankingPanel(parent, modes)
     p:SetAllPoints()
     p.mode = 1
     p.modeButtons = {}
+    -- botones de modo centrados en la ventana
+    local BW, GAP = 120, 6
+    local left = -(#modes * BW + (#modes - 1) * GAP) / 2
     for i, m in ipairs(modes) do
-        local b = W:Button(p, m.text, 120, 22, function() p.mode = i; p:Refresh() end)
-        b:SetPoint("TOPLEFT", 8 + (i - 1) * 126, -4)
+        local b = W:Button(p, m.text, BW, 22, function() p.mode = i; p:Refresh() end)
+        b:SetPoint("TOPLEFT", p, "TOP", left + (i - 1) * (BW + GAP), -4)
         p.modeButtons[i] = b
     end
     p.list = W:List(p)
@@ -86,68 +74,59 @@ local function buildProfile(parent)
     local p = CreateFrame("Frame", nil, parent)
     p:SetAllPoints()
 
-    local lbl = W:Label(p, "Tu main:", "GameFontNormal")
-    lbl:SetPoint("TOPLEFT", 12, -12)
+    -- Dos bloques grandes: PvP a la izquierda y PvE a la derecha
+    local function block(x, title)
+        local b = {}
+        b.title = W:BigLabel(p, 30, 1, 0.82, 0)
+        b.title:SetPoint("TOP", p, "TOP", x, -14)
+        b.title:SetText(title)
+        b.rank = W:BigLabel(p, 30, 0.9, 0.15, 0.15)
+        b.rank:SetPoint("TOP", p, "TOP", x, -54)
+        b.total = W:BigLabel(p, 18, 1, 1, 1)
+        b.total:SetPoint("TOP", p, "TOP", x, -96)
+        b.week = W:BigLabel(p, 13, 1, 1, 1)
+        b.week:SetPoint("TOP", p, "TOP", x + 40, -122)
+        return b
+    end
+    local pvp = block(-165, "PvP")
+    local pve = block(165, "PvE")
 
-    local dd = CreateFrame("Frame", "SolfaGuildMainDropDown", p, "UIDropDownMenuTemplate")
-    dd:SetPoint("LEFT", lbl, "RIGHT", -6, -2)
-    UIDropDownMenu_SetWidth(dd, 140)
-    UIDropDownMenu_Initialize(dd, function()
-        local names = {}
-        for name in pairs(SG:MyGuildChars()) do names[#names + 1] = name end
-        for name in pairs(SG.db.my.manualAlts) do names[#names + 1] = name end
-        table.sort(names)
-        for _, name in ipairs(names) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = name
-            info.checked = (name == SG.db.my.main)
-            info.func = function() SG:SetMain(name); UIDropDownMenu_SetText(dd, name) end
-            UIDropDownMenu_AddButton(info)
-        end
-    end)
-    p.dd = dd
-
-    local hint = W:Label(p, "Tus alters se detectan solos al entrar con ellos. Puedes añadir uno a mano:", "GameFontHighlightSmall")
-    hint:SetPoint("TOPLEFT", 12, -44)
-    local edit = W:Edit(p, 140)
-    edit:SetPoint("TOPLEFT", 18, -62)
-    local add = W:Button(p, "Añadir alter", 100, 22, function()
-        SG:AddManualAlt(edit:GetText()); edit:SetText(""); p:Refresh()
-    end)
-    add:SetPoint("LEFT", edit, "RIGHT", 8, 0)
-
-    p.summary = W:Label(p, "", "GameFontHighlight")
-    p.summary:SetPoint("TOPLEFT", 12, -92)
-    p.summary:SetWidth(600)
-    p.summary:SetSpacing(3)
-
-    p.list = W:List(p)
-    p.list:SetPoint("TOPLEFT", 8, -170)
-    p.list:SetPoint("BOTTOMRIGHT", -28, 8)
+    p.list = W:List(p, true)
+    p.list:SetPoint("TOPLEFT", 8, -160)
+    p.list:SetPoint("BOTTOMRIGHT", -8, 8)
 
     function p:Refresh()
-        UIDropDownMenu_SetText(dd, SG.db.my.main or SG:MyName())
         local t = SG.Milestones:MyTotals()
         local M, T = SG.Milestones, SG.Texts
-        self.summary:SetText(
-            "|cffffd100Rango PvP:|r " .. M:RankName(T.pvpRanks, t.kills) .. "  (" .. t.kills .. " asesinatos)\n" ..
-            "|cffffd100Rango de mazmorras:|r " .. M:RankName(T.dungeonRanks, t.dungeons) .. "  (" .. t.dungeons .. " completadas)\n" ..
-            "|cffffd100Oro de la cuenta:|r " .. SG:FormatMoney(SG:AccountSum(t.acc, "gold"), true) ..
-            "   |cffffd100Recolectado:|r " .. SG:FormatMoney(t.earned, true) .. "\n" ..
-            "|cffffd100Tiempo jugado:|r " .. SG:FormatTime(t.played))
-        local rows = { { text = "Tus personajes en la guild", header = true } }
+        pvp.rank:SetText(SG.PvP:LadderRankOf(t.acc) or "Sin rango")
+        pvp.total:SetText(t.kills .. " asesinatos")
+        pvp.week:SetText(t.killsWeek .. " esta semana")
+        pve.rank:SetText(M:RankName(T.dungeonRanks, t.dungeons))
+        pve.total:SetText(t.dungeons .. " dungeons")
+        pve.week:SetText(t.dungeonsWeek .. " esta semana")
+
+        local rows = { { text = "Tus personajes", header = true } }
+        -- por nivel y, si empatan, por tiempo jugado
         local names = {}
         for name in pairs(t.acc.chars) do names[#names + 1] = name end
-        table.sort(names)
+        table.sort(names, function(a, b)
+            local ca, cb = t.acc.chars[a], t.acc.chars[b]
+            local la, lb = ca.level or 0, cb.level or 0
+            if la ~= lb then return la > lb end
+            local pa, pb = ca.played or 0, cb.played or 0
+            if pa ~= pb then return pa > pb end
+            return a < b
+        end)
         for _, name in ipairs(names) do
             local c = t.acc.chars[name]
-            local isMe = name == SG:MyName()
+            local isMain = name == t.acc.main
             rows[#rows + 1] = {
                 text = SG:ClassColor(c.class) .. name .. "|r" .. (c.level and (" (" .. c.level .. ")") or "")
-                    .. (name == t.acc.main and " " .. STAR .. " |cffffd100main|r" or "")
-                    .. (c.manual and " |cff888888(añadido a mano)|r" or ""),
-                right = c.manual and "" or (SG:FormatMoney(c.gold, true) .. "  |cffff5555" .. (c.kills or 0) .. "|r " .. SKULL),
-                button = (not isMe) and { text = "Quitar", width = 60, onClick = function() SG:RemoveAlt(name); p:Refresh() end } or nil,
+                    .. (isMain and "  |cffffd100main|r" or ""),
+                right = SG:FormatMoney(c.earned or 0, true) .. "  |cffff5555" .. (c.kills or 0) .. "|r " .. SKULL,
+                icon = { texture = CROWN, disabled = isMain, dim = not isMain,  -- dorada solo la del main
+                    tooltip = isMain and "Este es tu main" or "Hacer main",
+                    onClick = function() SG:SetMain(name); p:Refresh() end },
             }
         end
         self.list:SetRows(rows)
@@ -160,54 +139,62 @@ end
 ---------------------------------------------------------------------------
 local function num(v) return "|cffffffff" .. SG.Thousands(v) .. "|r" end
 
-local function buildPvP(parent)
-    local function extras(rows)
-        rows[#rows + 1] = { text = " " }
-        rows[#rows + 1] = { text = "Zonas más sangrientas", header = true }
-        for i, z in ipairs(SG.PvP:TopZones(5)) do
-            rows[#rows + 1] = { text = i .. ". " .. z.zone, right = num(z.kills) .. " " .. SKULL }
+local INDENT = "      "
+local function you(acc) return acc.mine and " |cff88ff88(tú)|r" or "" end
+
+-- Las tres listas de PvP; week = true para contar solo esta semana
+local function pvpRows(week)
+    local rows = {}
+    local function blank() rows[#rows + 1] = { text = " " } end
+
+    -- Escalafón: los jugadores llenan los rangos de Texts.pvpLadder en orden
+    rows[#rows + 1] = { text = "Ranking de asesinatos", header = true }
+    local ladder, nobody = SG.PvP:Ladder(week)
+    for _, tier in ipairs(ladder) do
+        rows[#rows + 1] = { text = "|cffffd100" .. tier.name .. "|r" }
+        for _, it in ipairs(tier.members) do
+            rows[#rows + 1] = { text = INDENT .. SG:ColoredMain(it.acc) .. you(it.acc), right = num(it.value) .. " " .. SKULL }
         end
-        rows[#rows + 1] = { text = " " }
-        rows[#rows + 1] = { text = "Parejas más despiadadas", header = true }
-        local accs = SG:Accounts()
-        local byMain = {}
-        for _, a in pairs(accs) do byMain[a.main] = a end
-        local function cm(n) local a = byMain[n]; return a and SG:ColoredMain(a) or n end
-        for i, pr in ipairs(SG.PvP:TopPairs(5)) do
-            rows[#rows + 1] = { text = i .. ". " .. cm(pr.an) .. " & " .. cm(pr.bn), right = num(pr.kills) .. " juntos" }
-        end
-        return rows
     end
+    if nobody then   -- tú, aún sin asesinatos
+        rows[#rows + 1] = { text = "|cff888888Sin asesinatos|r" }
+        rows[#rows + 1] = { text = INDENT .. SG:ColoredMain(nobody.acc) .. you(nobody.acc), right = num(0) .. " " .. SKULL }
+    end
+
+    blank()
+    rows[#rows + 1] = { text = "Zonas más sangrientas", header = true }
+    local zones = SG.PvP:Zones(week)
+    for _, z in ipairs(zones) do
+        rows[#rows + 1] = { text = z.zone }
+        rows[#rows + 1] = { text = INDENT .. num(z.kills) .. " " .. SKULL }
+    end
+    if #zones == 0 then rows[#rows + 1] = { text = "|cff888888Aún no ha caído nadie.|r" } end
+
+    blank()
+    rows[#rows + 1] = { text = "Asesinatos coordinados", header = true }
+    local teams = SG.PvP:Teams(week)
+    for _, t in ipairs(teams) do
+        local names = {}
+        for _, acc in ipairs(t.accs) do names[#names + 1] = SG:ColoredMain(acc) .. you(acc) end
+        rows[#rows + 1] = { text = table.concat(names, "  "), right = num(t.kills) .. " " .. SKULL }
+    end
+    if #teams == 0 then rows[#rows + 1] = { text = "|cff888888Aún no hay asesinatos en equipo.|r" } end
+    return rows
+end
+
+local function buildPvP(parent)
     return makeRankingPanel(parent, {
-        { text = "Total", rows = function()
-            local rows = { { text = "Ranking de asesinatos (mundo abierto)", header = true } }
-            for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountSum(a, "kills") end),
-                function(v) return num(v) .. "  |cffb48cff" .. SG.Milestones:RankName(SG.Texts.pvpRanks, v) .. "|r" end,
-                function(c) return (c.kills or 0) .. " " .. SKULL end)) do rows[#rows + 1] = r end
-            return extras(rows)
-        end },
-        { text = "Esta semana", rows = function()
-            local rows = { { text = "Asesinatos esta semana", header = true } }
-            for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountWeekKills(a) end), num,
-                function(c) return (c.weekKey == SG:WeekKey() and c.killsWeek or 0) .. " " .. SKULL end)) do rows[#rows + 1] = r end
-            return extras(rows)
-        end },
+        { text = "Total", rows = function() return pvpRows(false) end },
+        { text = "Semanal", rows = function() return pvpRows(true) end },
     })
 end
 
 local function buildGold(parent)
     local function money(v) return SG:FormatMoney(v, true) end
     return makeRankingPanel(parent, {
-        { text = "Oro actual", rows = function()
-            local rows = { { text = "Oro actual (todos los personajes del jugador)", header = true } }
-            for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountSum(a, "gold") end), money,
-                function(c) return SG:FormatMoney(c.gold or 0, true) end)) do rows[#rows + 1] = r end
-            return rows
-        end },
-        { text = "Recolectado", rows = function()
-            local rows = { { text = "Oro recolectado en total", header = true } }
-            for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountSum(a, "earned") end), money,
-                function(c) return SG:FormatMoney(c.earned or 0, true) end)) do rows[#rows + 1] = r end
+        { text = "Acumulado", rows = function()
+            local rows = { { text = "Oro acumulado (todos los personajes del jugador)", header = true } }
+            for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountSum(a, "earned") end), money)) do rows[#rows + 1] = r end
             return rows
         end },
     })
@@ -217,10 +204,8 @@ local function buildDungeons(parent)
     return makeRankingPanel(parent, {
         { text = "Ranking", rows = function()
             local rows = { { text = "Mazmorras completadas", header = true } }
-            local function dcount(c) local n = 0; for _, k in pairs(c.dungeons or {}) do n = n + k end; return n end
             for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountDungeons(a) end),
-                function(v) return num(v) .. "  |cffb48cff" .. SG.Milestones:RankName(SG.Texts.dungeonRanks, v) .. "|r" end,
-                function(c) return dcount(c) .. "" end)) do rows[#rows + 1] = r end
+                function(v) return num(v) .. "  |cffb48cff" .. SG.Milestones:RankName(SG.Texts.dungeonRanks, v) .. "|r" end)) do rows[#rows + 1] = r end
             return rows
         end },
         { text = "Para mi nivel", rows = function()
@@ -249,8 +234,7 @@ local function buildPlaytime(parent)
         { text = "Más sudorosos", rows = function()
             local rows = { { text = "Tiempo de juego total", header = true } }
             for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountSum(a, "played") end),
-                function(v) return SG:FormatTime(v) end,
-                function(c) return SG:FormatTime(c.played or 0) end)) do rows[#rows + 1] = r end
+                function(v) return SG:FormatTime(v) end)) do rows[#rows + 1] = r end
             return rows
         end },
     })
@@ -397,7 +381,7 @@ local FEATURE_NAMES = {
     { "pvp", "Rangos PvP" }, { "gold", "Hitos de oro" }, { "dungeons", "Hitos de mazmorras" },
     { "playtime", "Ranking de tiempo" }, { "dungeonHelper", "Ayudante de mazmorras" },
     { "whisperIcon", "Nota musical en susurros" }, { "inviteIcon", "Aviso de invitaciones" },
-    { "zoneNotify", "Aviso de zona" }, { "events", "Eventos" },
+    { "zoneNotify", "Aviso de zona" }, { "events", "Eventos" }, { "campSOS", "SOS por campeo" },
 }
 
 local function buildAdmin(parent)
@@ -421,7 +405,7 @@ local function buildAdmin(parent)
         p.features[#p.features + 1] = cb
     end
 
-    local y = -100
+    local y = -122
     local function numField(label, x)
         local l = W:Label(box, label, "GameFontHighlightSmall")
         l:SetPoint("TOPLEFT", x, y)
@@ -435,6 +419,9 @@ local function buildAdmin(parent)
     p.dhBelow = numField("Mazmorras: niveles por debajo:", 10)
     p.dhAbove = numField("Niveles por encima:", 250)
     p.dhMax = numField("Desactivar a partir de nivel:", 420)
+    y = y - 24
+    p.campDeaths = numField("Campeo: muertes seguidas:", 10)
+    p.campWindow = numField("en (min):", 250)
 
     y = y - 30
     local r = W:Label(box, "Rangos de guild que pueden crear eventos:", "GameFontNormal")
@@ -468,6 +455,8 @@ local function buildAdmin(parent)
         cfg.dhBelow = tonumber(self.dhBelow:GetText()) or cfg.dhBelow
         cfg.dhAbove = tonumber(self.dhAbove:GetText()) or cfg.dhAbove
         cfg.dhMaxLevel = tonumber(self.dhMax:GetText()) or cfg.dhMaxLevel
+        cfg.campDeaths = tonumber(self.campDeaths:GetText()) or cfg.campDeaths
+        cfg.campWindow = tonumber(self.campWindow:GetText()) or cfg.campWindow
         cfg.eventRanks = {}
         for _, cb in ipairs(self.rankChecks) do if cb:IsShown() and cb:GetChecked() then cfg.eventRanks[cb.rankIndex] = true end end
         cfg.eventNames = {}
@@ -484,6 +473,7 @@ local function buildAdmin(parent)
         for _, cb in ipairs(self.features) do cb:SetChecked(cfg.features[cb.key] ~= false) end
         self.zoneCd:SetText(cfg.zoneCooldown); self.reminder:SetText(cfg.eventReminder)
         self.dhBelow:SetText(cfg.dhBelow); self.dhAbove:SetText(cfg.dhAbove); self.dhMax:SetText(cfg.dhMaxLevel)
+        self.campDeaths:SetText(cfg.campDeaths); self.campWindow:SetText(cfg.campWindow)
         local nr = GuildControlGetNumRanks and GuildControlGetNumRanks() or 0
         for i, cb in ipairs(self.rankChecks) do
             if i <= nr then
@@ -545,15 +535,15 @@ local function build()
     tinsert(UISpecialFrames, "SolfaGuildFrame")
     frame.sgTitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     frame.sgTitle:SetPoint("TOP", 0, -6)
-    frame.sgTitle:SetText(SG.ICON .. " SolfaGuild - Los Solfamidas")
+    frame.sgTitle:SetText(SG.ICON .. " SolfaGuild")
 
     local body = CreateFrame("Frame", nil, frame)
-    body:SetPoint("TOPLEFT", 10, -60)
-    body:SetPoint("BOTTOMRIGHT", -8, 8)
+    body:SetPoint("TOPLEFT", 10, -30)
+    body:SetPoint("BOTTOMRIGHT", -8, 40)
 
     for i, t in ipairs(TAB_ORDER) do
         local b = W:Button(frame, t.text, 90, 24, function() UI:Show(t.key) end)
-        b:SetPoint("TOPLEFT", 12 + (i - 1) * 93, -30)
+        b:SetPoint("BOTTOMLEFT", 12 + (i - 1) * 93, 12)  -- pestañas abajo
         tabs[t.key] = b
         local panel = BUILDERS[t.key](body)
         panel:Hide()
@@ -565,7 +555,15 @@ local function build()
 end
 
 function UI:Show(key)
-    if not frame then build() end
+    if not frame then
+        -- si falla al construirla, no dejamos una ventana a medias
+        local ok, err = pcall(build)
+        if not ok then
+            if frame then frame:Hide() end
+            frame, tabs, panels = nil, {}, {}
+            error(err, 0)
+        end
+    end
     current = key or current or "profile"
     for k, p in pairs(panels) do p:SetShown(k == current) end
     for k, b in pairs(tabs) do

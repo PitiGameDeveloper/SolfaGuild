@@ -137,8 +137,7 @@ local function dispatch(msg, sender, channel)
     local list = receivers[msg.t]
     if not list then return end
     for _, fn in ipairs(list) do
-        local ok, err = pcall(fn, msg, sender, channel)
-        if not ok then geterrorhandler()(err) end
+        SG:Try(fn, msg, sender, channel)
     end
 end
 

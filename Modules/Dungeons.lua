@@ -20,6 +20,8 @@ function D:Complete(d)
     lastDone[d.id] = now
     local c = SG:MyChar()
     c.dungeons[d.id] = (c.dungeons[d.id] or 0) + 1
+    SG:CheckWeek(c)
+    c.dungeonsWeek = (c.dungeonsWeek or 0) + 1
     SG:MarkDirty()
     SG:Print("Mazmorra completada: |cffffd100" .. d.name .. "|r")
     SG:Fire("DUNGEON_DONE", d)
@@ -43,6 +45,6 @@ function D:CharDone(charName, dungeonId)
     local acc = SG:AccountOf(charName)
     if not acc then return nil end
     local c = acc.chars[charName]
-    if not c or c.manual then return nil end
+    if not c then return nil end
     return (c.dungeons and c.dungeons[dungeonId] or 0) > 0
 end

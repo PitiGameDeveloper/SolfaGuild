@@ -1,5 +1,7 @@
--- SolfaGuild - Oro: total recolectado (vida de la cuenta) y oro actual.
--- No cuenta como "recolectado" el oro que te envías por correo desde tus alters.
+-- SolfaGuild - Oro: solo cuenta el oro acumulado (vida de la cuenta).
+-- La primera vez que entras con un personaje se suma el oro que ya tenía; a
+-- partir de ahí suma todo lo que gana. No cuenta el oro que te envías por
+-- correo desde tus alters (ya se contó al ganarlo).
 
 local _, ns = ...
 local SG = ns.SG
@@ -12,10 +14,25 @@ local ignore = { amount = 0, until_ = 0 }
 
 local function fmt(v) return SG:FormatMoney(v) end
 
+local function checkMilestones()
+    if not SG:Feature("gold") then return end
+    local t = SG.Milestones:MyTotals()
+    SG.Milestones:Check("goldE", SG.Texts.goldEarned, t.earned, "HITO DE ORO", nil, fmt)
+end
+
+-- Primera vez con este personaje: su oro actual entra en el acumulado
+local function seed(c, money)
+    c.earned = (c.earned or 0) + money
+    c.goldSeeded = true
+    SG:MarkDirty()
+    checkMilestones()
+end
+
 function Gold:OnLogin()
     last = GetMoney()
     local c = SG:MyChar()
-    c.gold = last
+    -- si el WoW aún devuelve 0, esperamos al primer cambio de dinero
+    if not c.goldSeeded and last > 0 then seed(c, last) end
     -- correo de un alter propio => no es oro "ganado"
     if TakeInboxMoney then
         hooksecurefunc("TakeInboxMoney", function(index)
@@ -31,24 +48,25 @@ end
 
 SG:On("PLAYER_MONEY", function()
     local now = GetMoney()
+    local c = SG:MyChar()
+    if not c.goldSeeded then
+        last = now
+        seed(c, now)
+        return
+    end
     if not last then last = now; return end
     local delta = now - last
     last = now
-    local c = SG:MyChar()
-    c.gold = now
-    if delta > 0 then
-        if ignore.amount > 0 and GetTime() <= ignore.until_ then
-            local skip = math.min(delta, ignore.amount)
-            ignore.amount = ignore.amount - skip
-            delta = delta - skip
-        else
-            ignore.amount = 0
-        end
-        c.earned = (c.earned or 0) + delta
+    if delta <= 0 then return end
+    if ignore.amount > 0 and GetTime() <= ignore.until_ then
+        local skip = math.min(delta, ignore.amount)
+        ignore.amount = ignore.amount - skip
+        delta = delta - skip
+    else
+        ignore.amount = 0
     end
+    if delta <= 0 then return end
+    c.earned = (c.earned or 0) + delta
     SG:MarkDirty()
-    if not SG:Feature("gold") then return end
-    local t = SG.Milestones:MyTotals()
-    SG.Milestones:Check("goldE", SG.Texts.goldEarned, t.earned, "HITO DE ORO", nil, fmt)
-    SG.Milestones:Check("goldH", SG.Texts.goldHeld, now, "HITO DE ORO", nil, fmt)
+    checkMilestones()
 end)

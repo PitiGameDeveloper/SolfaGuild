@@ -51,6 +51,8 @@ function M:MyTotals()
         kills = SG:AccountSum(acc, "kills"),
         earned = SG:AccountSum(acc, "earned"),
         dungeons = SG:AccountDungeons(acc),
+        killsWeek = SG:AccountWeekKills(acc),
+        dungeonsWeek = SG:AccountWeekDungeons(acc),
         played = SG:AccountSum(acc, "played"),
         acc = acc,
     }

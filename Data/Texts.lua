@@ -44,6 +44,19 @@ T.pvpRanks = {
 }
 
 ---------------------------------------------------------------------------
+-- ESCALAFÓN PVP de la pestaña PvP: los jugadores se ordenan por asesinatos y
+-- van llenando los rangos de arriba abajo. "players" = cuántos caben en ese
+-- rango; el último (sin "players") se queda con todos los que sobren.
+---------------------------------------------------------------------------
+T.pvpLadder = {
+    { name = "Señor de la Guerra", players = 1 },
+    { name = "Campeones",          players = 3 },
+    { name = "Veteranos",          players = 5 },
+    { name = "Grunts",             players = 10 },
+    { name = "Reclutas" },
+}
+
+---------------------------------------------------------------------------
 -- ORO: total recolectado en la vida de la cuenta
 ---------------------------------------------------------------------------
 T.goldEarned = {
@@ -55,18 +68,6 @@ T.goldEarned = {
       title = "¡1.000 de oro recolectados!", text = "%count%. Ya puedes mirar por encima del hombro al banquero de Orgrimmar." },
     { at = 5000 * 10000,  name = "Barón del Oro",    icon = "Interface\\Icons\\INV_Misc_Coin_04",
       title = "5.000 de oro recolectados", text = "%count%. Gallywix tiene envidia." },
-}
-
----------------------------------------------------------------------------
--- ORO: oro acumulado en el inventario del personaje
----------------------------------------------------------------------------
-T.goldHeld = {
-    { at = 10 * 10000,    name = "Bolsa tintineante", icon = "Interface\\Icons\\INV_Misc_Bag_10",
-      title = "10 de oro en la bolsa", text = "Llevas %count% encima. ¡Cuidado con los pícaros!" },
-    { at = 100 * 10000,   name = "Bolsa pesada",      icon = "Interface\\Icons\\INV_Misc_Bag_10_Blue",
-      title = "100 de oro en la bolsa", text = "%count% en el bolsillo. Huele a montura." },
-    { at = 1000 * 10000,  name = "Cofre andante",     icon = "Interface\\Icons\\INV_Misc_Bag_10_Black",
-      title = "¡1.000 de oro en la bolsa!", text = "%count%. Caminas haciendo 'cling cling'." },
 }
 
 ---------------------------------------------------------------------------
@@ -96,6 +97,21 @@ T.ui = {
     dhWhisper = "¡Ey! Voy a hacer %dungeon%, estás en nivel para venir, ¿te apuntas? [SolfaGuild]",
     eventSoon = "El evento '%title%' empieza en %min% minutos.",
     eventNow = "¡El evento '%title%' empieza AHORA!",
+    -- SOS por campeo (%killer% = quien te mata, %who% = jugador, %zone% = zona)
+    campAskTitle = "¡Te están campeando!",
+    campAskText = "Parece que estás siendo campeado por un sucio %enemy% (%killer%), ¿quieres pedir refuerzos?",
+    campAskYes = "Convocar a los solfamidas",
+    campAskNo = "Sigo en solitario",
+    campCallTitle = "¡Un solfamido pide refuerzos!",
+    campCallText = "Un solfamido (%who%) está siendo campeado por un sucio %enemy% y necesita apoyo, en %zone%.",
+    campCallLeave = "|cffffd200(si aceptas se te echará del grupo en el que estés)|r",
+    campCallYes = "Acudir a la llamada",
+    campCallNo = "Ahora no puedo",
+    campLeft = "Has salido de tu grupo para montar una banda con los refuerzos.",
+    campSent = "Refuerzos pedidos a la guild. Quien acuda recibirá invitación a tu grupo automáticamente.",
+    campGoing = "Vas en ayuda de %who%. Aceptarás su invitación automáticamente.",
+    campNoJoin = "%who% no ha podido entrar en el grupo tras varios intentos.",
+    campComing = "%who% acude a la llamada. Invitándole al grupo...",
 }
 
 -- Sustituye marcadores

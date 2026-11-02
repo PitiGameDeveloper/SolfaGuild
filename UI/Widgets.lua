@@ -21,6 +21,16 @@ function W:Label(parent, text, font)
     return fs
 end
 
+-- Texto grande con tamaño y color propios (r, g, b de 0 a 1)
+function W:BigLabel(parent, size, r, g, b)
+    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+    local font, _, flags = fs:GetFont()
+    fs:SetFont(font, size, flags)
+    fs:SetTextColor(r or 1, g or 1, b or 1)
+    fs:SetShadowOffset(1, -1)
+    return fs
+end
+
 function W:Check(parent, text, onClick)
     local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
     cb:SetSize(24, 24)
@@ -41,18 +51,25 @@ function W:Edit(parent, w, numeric)
     return e
 end
 
--- Lista con scroll. rows = { { text, right, header, color, button = {text, onClick}, tooltip = {lineas} } }
-function W:List(parent)
-    local scroll = CreateFrame("ScrollFrame", nil, parent, "UIPanelScrollFrameTemplate")
-    local content = CreateFrame("Frame", nil, scroll)
-    content:SetSize(10, 10)
-    scroll:SetScrollChild(content)
+-- Lista con scroll. rows = { { text, right, header, color, button = {text, onClick}, tooltip = {lineas},
+--   icon = {texture, onClick, tooltip, disabled (no se puede pulsar), dim (apagado)} } }
+-- noScroll: lista fija sin barra de desplazamiento (para listas cortas)
+function W:List(parent, noScroll)
+    local scroll, content
+    if noScroll then
+        scroll = CreateFrame("Frame", nil, parent)
+        content = scroll
+    else
+        scroll = CreateFrame("ScrollFrame", nil, parent, "UIPanelScrollFrameTemplate")
+        content = CreateFrame("Frame", nil, scroll)
+        content:SetSize(10, 10)
+        scroll:SetScrollChild(content)
+        scroll:SetScript("OnSizeChanged", function(self, w) content:SetWidth(w) end)
+    end
     scroll.rows = {}
-    scroll:SetScript("OnSizeChanged", function(self, w) content:SetWidth(w) end)
 
     function scroll:SetRows(rows)
-        local width = self:GetWidth()
-        content:SetWidth(width)
+        if not noScroll then content:SetWidth(self:GetWidth()) end
         for _, r in ipairs(self.rows) do r:Hide() end
         local y = 0
         for i, data in ipairs(rows) do
@@ -70,6 +87,18 @@ function W:List(parent)
                 r.btn = CreateFrame("Button", nil, r, "UIPanelButtonTemplate")
                 r.btn:SetSize(90, 18)
                 r.btn:SetPoint("RIGHT", -2, 0)
+                r.ibtn = CreateFrame("Button", nil, r)
+                r.ibtn:SetSize(16, 16)
+                r.ibtn:SetPoint("RIGHT", -4, 0)
+                r.ibtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+                r.ibtn:SetScript("OnEnter", function(self)
+                    if self.tip then
+                        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                        GameTooltip:SetText(self.tip)
+                        GameTooltip:Show()
+                    end
+                end)
+                r.ibtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
                 r:EnableMouse(true)
                 r:SetScript("OnEnter", function(self)
                     if self.tooltip then
@@ -95,6 +124,18 @@ function W:List(parent)
                 r.left:SetFontObject("GameFontHighlight")
                 r.bg:SetColorTexture(1, 1, 1, (i % 2 == 0) and 0.03 or 0)
             end
+            r.ibtn:Hide()
+            if data.icon then
+                local ic = data.icon
+                r.ibtn:SetNormalTexture(ic.texture)
+                local tex = r.ibtn:GetNormalTexture()
+                tex:SetDesaturated(ic.dim and true or false)
+                tex:SetAlpha(ic.dim and 0.4 or 1)
+                r.ibtn:SetEnabled(not ic.disabled)
+                r.ibtn:SetScript("OnClick", ic.onClick)
+                r.ibtn.tip = ic.tooltip
+                r.ibtn:Show()
+            end
             if data.button then
                 r.btn:SetText(data.button.text)
                 r.btn:SetWidth(data.button.width or 90)
@@ -103,12 +144,13 @@ function W:List(parent)
                 r.right:SetPoint("RIGHT", r.btn, "LEFT", -6, 0)
             else
                 r.btn:Hide()
-                r.right:SetPoint("RIGHT", -6, 0)
+                if data.icon then r.right:SetPoint("RIGHT", r.ibtn, "LEFT", -8, 0)
+                else r.right:SetPoint("RIGHT", -6, 0) end
             end
             r:Show()
             y = y + 18
         end
-        content:SetHeight(math.max(y, 10))
+        if not noScroll then content:SetHeight(math.max(y, 10)) end
     end
     return scroll
 end

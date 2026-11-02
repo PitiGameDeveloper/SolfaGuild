@@ -17,6 +17,32 @@ SG.COLOR   = "|cffb48cff"
 SG.modules = {}
 
 ---------------------------------------------------------------------------
+-- Errores: se avisan en el chat (una vez por sesión) y se guardan en
+-- SolfaGuildDB.errors para poder revisarlos fuera del juego.
+---------------------------------------------------------------------------
+local seenErrors = {}
+local pendingErrors = {}   -- errores de antes de cargar la base de datos
+
+function SG:ReportError(err, stack)
+    err = tostring(err)
+    local list = SolfaGuildDB and SolfaGuildDB.errors or pendingErrors
+    table.insert(list, { t = time(), v = SG.version, err = err, stack = stack })
+    while #list > 20 do table.remove(list, 1) end
+    if not seenErrors[err] then
+        seenErrors[err] = true
+        DEFAULT_CHAT_FRAME:AddMessage(SG.ICON .. " " .. SG.COLOR .. "SolfaGuild|r |cffff5555error:|r " .. err)
+    end
+end
+
+-- Ejecuta fn protegida; si falla, informa del error. Devuelve true si fue bien.
+function SG:Try(fn, ...)
+    local args, n = { ... }, select("#", ...)
+    return xpcall(function() return fn(unpack(args, 1, n)) end, function(err)
+        SG:ReportError(err, debugstack and debugstack(2, 12, 0) or nil)
+    end)
+end
+
+---------------------------------------------------------------------------
 -- Eventos
 ---------------------------------------------------------------------------
 local frame = CreateFrame("Frame")
@@ -35,8 +61,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
     local list = handlers[event]
     if not list then return end
     for i = 1, #list do
-        local ok, err = pcall(list[i], ...)
-        if not ok then geterrorhandler()(err) end
+        SG:Try(list[i], ...)
     end
 end)
 
@@ -50,8 +75,7 @@ function SG:Fire(name, ...)
     local list = callbacks[name]
     if not list then return end
     for i = 1, #list do
-        local ok, err = pcall(list[i], ...)
-        if not ok then geterrorhandler()(err) end
+        SG:Try(list[i], ...)
     end
 end
 
@@ -96,9 +120,25 @@ function SG:GuildName()
     return g
 end
 
--- Clave de semana (lunes a domingo)
-function SG:WeekKey(t)
-    return date("%Y-%W", t or time())
+-- Clave de semana: la semana empieza con el reinicio semanal del WoW (los
+-- miércoles en Europa). La clave es la fecha (AAAA-MM-DD) del último reinicio.
+local RESET_WDAY, RESET_HOUR = 4, 5   -- miércoles (1 = domingo) a las 05:00, si el juego no lo dice
+function SG:WeekKey()
+    local now = time()
+    local untilReset = C_DateAndTime and C_DateAndTime.GetSecondsUntilWeeklyReset
+        and C_DateAndTime.GetSecondsUntilWeeklyReset()
+    local last
+    if untilReset and untilReset > 0 then
+        last = now + untilReset - 7 * 86400
+    else
+        local d = date("*t", now)
+        local back = (d.wday - RESET_WDAY) % 7
+        last = time({ year = d.year, month = d.month, day = d.day - back, hour = RESET_HOUR, min = 0, sec = 0 })
+        if last > now then last = last - 7 * 86400 end
+    end
+    -- redondeo a la hora para que no baile por segundos
+    last = math.floor((last + 1800) / 3600) * 3600
+    return date("%Y-%m-%d", last)
 end
 
 -- 787226033 -> "7.872o 26p 33c"
@@ -163,8 +203,7 @@ SG:On("PLAYER_REGEN_ENABLED", function()
         local list = afterCombat
         afterCombat = {}
         for _, fn in ipairs(list) do
-            local ok, err = pcall(fn)
-            if not ok then geterrorhandler()(err) end
+            SG:Try(fn)
         end
     end)
 end)
@@ -205,7 +244,6 @@ local DB_DEFAULTS = {
     my = {
         main = nil,         -- nombre del main elegido
         chars = {},         -- [nombre] = datos completos del personaje
-        manualAlts = {},    -- [nombre] = true (alters aún no logueados con el addon)
         milestones = {},    -- [clave] = timestamp (hitos ya celebrados, por jugador)
         dhNotified = {},    -- [char..dungeon] = true
         isGMAccount = {},   -- [guild] = true si esta cuenta tiene al GM
@@ -214,12 +252,15 @@ local DB_DEFAULTS = {
     zoneNotify = {},        -- [zona] = timestamp
     ui = { minimapAngle = 200, hideMinimap = false },
     debug = false,
+    errors = {},            -- últimos errores (ver SG:ReportError)
 }
 
 function SG:InitDB()
     SolfaGuildDB = SolfaGuildDB or {}
     self:CopyDefaults(SolfaGuildDB, DB_DEFAULTS)
     self.db = SolfaGuildDB
+    for _, e in ipairs(pendingErrors) do table.insert(self.db.errors, e) end
+    wipe(pendingErrors)
     if not self.db.accountId then
         self.db.accountId = self:RandomId(12)
     end
@@ -252,9 +293,9 @@ function SG:MyChar()
         class = select(2, UnitClass("player")),
         level = UnitLevel("player"),
         guild = nil,
-        kills = 0, killsWeek = 0, weekKey = "",
-        zones = {}, partners = {},
-        gold = 0, earned = 0,
+        kills = 0, killsWeek = 0, dungeonsWeek = 0, weekKey = "",
+        zones = {}, zonesWeek = {}, teams = {}, teamsWeek = {},
+        earned = 0,
         dungeons = {},
         played = 0,
         updated = 0,
@@ -267,12 +308,10 @@ end
 ---------------------------------------------------------------------------
 SG:On("ADDON_LOADED", function(name)
     if name ~= ADDON_NAME then return end
-    math.randomseed(time() + math.floor(GetTime() * 1000))
     SG:InitDB()
     for _, mod in ipairs(SG.modules) do
         if mod.OnInit then
-            local ok, err = pcall(mod.OnInit, mod)
-            if not ok then geterrorhandler()(err) end
+            SG:Try(mod.OnInit, mod)
         end
     end
 end)
@@ -284,8 +323,7 @@ SG:On("PLAYER_LOGIN", function()
     if not SG.db.my.main then SG.db.my.main = SG:MyName() end
     for _, mod in ipairs(SG.modules) do
         if mod.OnLogin then
-            local ok, err = pcall(mod.OnLogin, mod)
-            if not ok then geterrorhandler()(err) end
+            SG:Try(mod.OnLogin, mod)
         end
     end
     SG:Print("v" .. SG.version .. " cargado. Escribe |cffffff00/solfa|r para abrir la ventana.")
@@ -300,8 +338,12 @@ end)
 ---------------------------------------------------------------------------
 SLASH_SOLFAGUILD1 = "/solfa"
 SLASH_SOLFAGUILD2 = "/sg"
-SlashCmdList["SOLFAGUILD"] = function(msg)
+local function slash(msg)
     msg = strtrim(msg or ""):lower()
+    if not SG.db then
+        SG:Print("|cffff5555El addon no se ha iniciado bien.|r Haz /reload y mira si sale algún error en el chat.")
+        return
+    end
     if msg == "debug" then
         SG.db.debug = not SG.db.debug
         SG:Print("Debug:", SG.db.debug and "ON" or "OFF")
@@ -313,7 +355,12 @@ SlashCmdList["SOLFAGUILD"] = function(msg)
         SG:Fire("MINIMAP_TOGGLE")
     elseif msg == "test" then
         SG:Fire("TEST_POPUP")
+    elseif msg == "campeo" then
+        SG:Fire("TEST_CAMP")
     else
         if SG.UI and SG.UI.Toggle then SG.UI:Toggle() end
     end
 end
+
+-- protegido: si algo falla, el chat se cierra igual y el error sale en el chat
+SlashCmdList["SOLFAGUILD"] = function(msg) SG:Try(slash, msg) end

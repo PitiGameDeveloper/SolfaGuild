@@ -81,16 +81,27 @@ local function topN(t, n)
     return out
 end
 
-function SG:RefreshMyChar()
+-- loggingOut: al salir, GetGuildInfo() puede devolver nil, así que no tocamos
+-- la guild guardada.
+function SG:RefreshMyChar(loggingOut)
     local c = self:MyChar()
     c.level = UnitLevel("player")
     c.class = select(2, UnitClass("player"))
-    c.guild = self:GuildName()
-    c.gold = GetMoney()
-    local wk = self:WeekKey()
-    if c.weekKey ~= wk then c.weekKey = wk; c.killsWeek = 0 end
     if self.Playtime then self.Playtime:Update() end
+    if loggingOut then return c end
+    c.guild = self:GuildName()
+    c.gold = nil   -- de versiones anteriores: el oro actual ya no se guarda
+    c.partners = nil  -- de versiones anteriores: ahora son "teams"
+    self:CheckWeek(c)
     return c
+end
+
+-- Nueva semana: reinicia los contadores semanales del personaje
+function SG:CheckWeek(c)
+    local wk = self:WeekKey()
+    if c.weekKey ~= wk then
+        c.weekKey = wk; c.killsWeek = 0; c.dungeonsWeek = 0; c.zonesWeek = {}; c.teamsWeek = {}
+    end
 end
 
 -- Personajes de mi cuenta que están en la guild actual
@@ -103,19 +114,22 @@ function SG:MyGuildChars()
     return out
 end
 
-function SG:BuildMyProfile()
+-- public: perfil para enviar a la guild. El oro acumulado solo viaja como
+-- total de la cuenta (earned); el de cada personaje no sale de este PC.
+function SG:BuildMyProfile(public)
     self:RefreshMyChar()
     local chars = {}
+    local earned = 0
     for name, c in pairs(self:MyGuildChars()) do
+        earned = earned + (tonumber(c.earned) or 0)
         chars[name] = {
             class = c.class, level = c.level,
-            kills = c.kills, killsWeek = c.killsWeek, weekKey = c.weekKey,
-            gold = c.gold, earned = c.earned, played = c.played,
-            dungeons = c.dungeons, zones = topN(c.zones, 8), partners = topN(c.partners, 8),
+            kills = c.kills, killsWeek = c.killsWeek, dungeonsWeek = c.dungeonsWeek, weekKey = c.weekKey,
+            earned = (not public) and c.earned or nil,
+            played = c.played,
+            dungeons = c.dungeons, zones = c.zones, zonesWeek = c.zonesWeek,
+            teams = topN(c.teams, 15), teamsWeek = topN(c.teamsWeek, 15),
         }
-    end
-    for name in pairs(self.db.my.manualAlts) do
-        if not chars[name] then chars[name] = { manual = true } end
     end
     local main = self.db.my.main
     if not chars[main] then main = self:MyName() end
@@ -123,6 +137,7 @@ function SG:BuildMyProfile()
         id = self.db.accountId,
         main = main,
         chars = chars,
+        earned = earned,
         updated = self:Now(),
         milestones = self.db.my.milestones,
     }
@@ -141,9 +156,9 @@ end
 function SG:Accounts()
     local gdb = self:GuildDB()
     local list = {}
-    if not gdb then return list end
     local mine = self:MyAccount()
-    list[mine.id] = mine
+    list[mine.id] = mine   -- tú siempre sales, aunque no tengas guild
+    if not gdb then return list end
     -- índice para resolver personajes reclamados por varias cuentas (gana el más reciente)
     local owner = {}
     for name in pairs(mine.chars) do owner[name] = { id = mine.id, u = math.huge } end
@@ -157,7 +172,8 @@ function SG:Accounts()
     end
     for id, acc in pairs(gdb.accounts) do
         if id ~= mine.id then
-            local copy = { id = id, main = acc.main, updated = acc.updated, chars = {}, milestones = acc.milestones }
+            local copy = { id = id, main = acc.main, updated = acc.updated, chars = {}, milestones = acc.milestones,
+                earned = acc.earned }
             for name, c in pairs(acc.chars or {}) do
                 if owner[name] and owner[name].id == id then copy.chars[name] = c end
             end
@@ -192,8 +208,10 @@ function SG:ColoredMain(acc)
     return self:ClassColor(self:ClassOf(main, acc)) .. main .. "|r"
 end
 
--- Suma un campo de todos los personajes de una cuenta
+-- Suma un campo de todos los personajes de una cuenta. Si la cuenta trae el
+-- total ya hecho (oro de otros jugadores), se usa ese.
 function SG:AccountSum(acc, field)
+    if type(acc[field]) == "number" then return acc[field] end
     local total = 0
     for _, c in pairs(acc.chars or {}) do total = total + (tonumber(c[field]) or 0) end
     return total
@@ -203,6 +221,14 @@ function SG:AccountWeekKills(acc)
     local wk, total = self:WeekKey(), 0
     for _, c in pairs(acc.chars or {}) do
         if c.weekKey == wk then total = total + (c.killsWeek or 0) end
+    end
+    return total
+end
+
+function SG:AccountWeekDungeons(acc)
+    local wk, total = self:WeekKey(), 0
+    for _, c in pairs(acc.chars or {}) do
+        if c.weekKey == wk then total = total + (c.dungeonsWeek or 0) end
     end
     return total
 end
@@ -220,7 +246,8 @@ function SG:Ranking(valueFn)
     local out = {}
     for _, acc in pairs(self:Accounts()) do
         local v = valueFn(acc)
-        if v and v > 0 then out[#out + 1] = { acc = acc, value = v } end
+        -- los demás solo salen si tienen algo; tú siempre, para que veas dónde estás
+        if v and (v > 0 or acc.mine) then out[#out + 1] = { acc = acc, value = v or 0 } end
     end
     table.sort(out, function(a, b) return a.value > b.value end)
     return out
@@ -234,7 +261,7 @@ function SG:MarkDirty() dirty = true end
 
 function SG:BroadcastProfile(channel, target)
     if not IsInGuild() then return end
-    local p = self:BuildMyProfile()
+    local p = self:BuildMyProfile(true)
     p.t = "PROF"
     Comm:Send(p, channel or "GUILD", target)
     if not channel or channel == "GUILD" then dirty = false end
@@ -246,7 +273,12 @@ local function storeAccount(p, sender)
     if p.id == SG.db.accountId then return false end
     local old = gdb.accounts[p.id]
     if old and (old.updated or 0) >= (p.updated or 0) then return false end
-    gdb.accounts[p.id] = { main = p.main, chars = p.chars, updated = p.updated, milestones = p.milestones }
+    -- del oro solo guardamos el total acumulado, aunque alguien envíe el de cada personaje
+    for _, c in pairs(p.chars) do
+        if type(c) == "table" then c.gold, c.earned = nil, nil end
+    end
+    gdb.accounts[p.id] = { main = p.main, chars = p.chars, updated = p.updated, milestones = p.milestones,
+        earned = tonumber(p.earned) }
     for name in pairs(p.chars) do gdb.seen[name] = gdb.seen[name] or p.updated end
     -- el GM solo se reconoce si el perfil lo envía el propio GM
     if sender and SG.gmName and sender == SG.gmName and p.chars[sender] then
@@ -278,7 +310,8 @@ Comm:Register("HELLO", function(msg, sender)
             for id, acc in pairs(gdb.accounts) do
                 if (acc.updated or 0) > (digest[id] or 0) and id ~= msg.id then
                     Comm:Send({ t = "RELAY", id = id, main = acc.main, chars = acc.chars,
-                        updated = acc.updated, milestones = acc.milestones }, "WHISPER", sender)
+                        updated = acc.updated, milestones = acc.milestones,
+                        earned = acc.earned }, "WHISPER", sender)
                 end
             end
             SG:Fire("HELLO_RELAY", msg, sender)
@@ -315,28 +348,9 @@ SG:Listen("REQUEST_SYNC", function() SG:SendHello() end)
 -- Main / alters
 ---------------------------------------------------------------------------
 function SG:SetMain(name)
-    if not self.db.my.chars[name] and not self.db.my.manualAlts[name] then return end
+    if not self.db.my.chars[name] then return end
     self.db.my.main = name
     self:Print("Tu main ahora es " .. name .. ". Tus estadísticas siguen sumando igual.")
-    self:BroadcastProfile()
-    self:Fire("DATA_UPDATED")
-end
-
-function SG:AddManualAlt(name)
-    name = strtrim(name or "")
-    if name == "" then return end
-    name = name:sub(1, 1):upper() .. name:sub(2)
-    self.db.my.manualAlts[name] = true
-    self:BroadcastProfile()
-    self:Fire("DATA_UPDATED")
-end
-
-function SG:RemoveAlt(name)
-    if name == self:MyName() then return end
-    self.db.my.manualAlts[name] = nil
-    local c = self.db.my.chars[name]
-    if c then c.guild = nil end  -- deja de contar para esta guild
-    if self.db.my.main == name then self.db.my.main = self:MyName() end
     self:BroadcastProfile()
     self:Fire("DATA_UPDATED")
 end
@@ -368,5 +382,5 @@ SG:On("PLAYER_GUILD_UPDATE", function()
 end)
 
 SG:On("PLAYER_LOGOUT", function()
-    SG:RefreshMyChar()
+    SG:RefreshMyChar(true)
 end)
