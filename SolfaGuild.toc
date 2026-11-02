@@ -1,6 +1,6 @@
 ## Interface: 11507, 11508, 11509, 16001
 ## Title: |cffb48cffSolfaGuild|r
-## Notes: Funcionalidades de guild para Los Solfamidas: rankings, PvP, oro, mazmorras, eventos y más.
+## Notes: Funcionalidades de guild para Los Solfamidas: rankings, PvP, oro, eventos y más.
 ## Author: Piti
 ## Version: 0.1.0
 ## SavedVariables: SolfaGuildDB
@@ -9,16 +9,17 @@
 Core.lua
 Comm.lua
 Data\Texts.lua
-Data\Dungeons.lua
+# PvE/mazmorras oculto de momento (para recuperarlo, quitar el # de estas tres líneas)
+# Data\Dungeons.lua
 Modules\Players.lua
 Modules\Settings.lua
 Modules\Popup.lua
 Modules\Milestones.lua
 Modules\PvP.lua
 Modules\Gold.lua
-Modules\Dungeons.lua
+# Modules\Dungeons.lua
 Modules\Playtime.lua
-Modules\DungeonHelper.lua
+# Modules\DungeonHelper.lua
 Modules\Social.lua
 Modules\CampSOS.lua
 Modules\Events.lua

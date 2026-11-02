@@ -14,7 +14,7 @@ local CHECK = "|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t"
 local TAB_ORDER = {
     { key = "profile",  text = "Perfil" },
     { key = "pvp",      text = "PvP" },
-    { key = "dungeons", text = "PvE" },
+    -- { key = "dungeons", text = "PvE" },  -- PvE oculto de momento
     { key = "gold",     text = "Oro" },
     { key = "playtime", text = "Tiempo" },
     { key = "events",   text = "Eventos" },
@@ -74,7 +74,7 @@ local function buildProfile(parent)
     local p = CreateFrame("Frame", nil, parent)
     p:SetAllPoints()
 
-    -- Dos bloques grandes: PvP a la izquierda y PvE a la derecha
+    -- Bloque grande de PvP (el de PvE, a la derecha, está oculto de momento)
     local function block(x, title)
         local b = {}
         b.title = W:BigLabel(p, 30, 1, 0.82, 0)
@@ -88,8 +88,9 @@ local function buildProfile(parent)
         b.week:SetPoint("TOP", p, "TOP", x + 40, -122)
         return b
     end
-    local pvp = block(-165, "PvP")
-    local pve = block(165, "PvE")
+    local pvp = block(0, "PvP")
+    -- local pvp = block(-165, "PvP")
+    -- local pve = block(165, "PvE")
 
     p.list = W:List(p, true)
     p.list:SetPoint("TOPLEFT", 8, -160)
@@ -101,9 +102,9 @@ local function buildProfile(parent)
         pvp.rank:SetText(SG.PvP:LadderRankOf(t.acc) or "Sin rango")
         pvp.total:SetText(t.kills .. " asesinatos")
         pvp.week:SetText(t.killsWeek .. " esta semana")
-        pve.rank:SetText(M:RankName(T.dungeonRanks, t.dungeons))
-        pve.total:SetText(t.dungeons .. " dungeons")
-        pve.week:SetText(t.dungeonsWeek .. " esta semana")
+        -- pve.rank:SetText(M:RankName(T.dungeonRanks, t.dungeons))
+        -- pve.total:SetText(t.dungeons .. " dungeons")
+        -- pve.week:SetText(t.dungeonsWeek .. " esta semana")
 
         local rows = { { text = "Tus personajes", header = true } }
         -- por nivel y, si empatan, por tiempo jugado
@@ -200,34 +201,35 @@ local function buildGold(parent)
     })
 end
 
-local function buildDungeons(parent)
-    return makeRankingPanel(parent, {
-        { text = "Ranking", rows = function()
-            local rows = { { text = "Mazmorras completadas", header = true } }
-            for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountDungeons(a) end),
-                function(v) return num(v) .. "  |cffb48cff" .. SG.Milestones:RankName(SG.Texts.dungeonRanks, v) .. "|r" end)) do rows[#rows + 1] = r end
-            return rows
-        end },
-        { text = "Para mi nivel", rows = function()
-            local lvl = UnitLevel("player")
-            local rows = { { text = "Mazmorras para nivel " .. lvl, header = true } }
-            local list = SG.DungeonHelper:ForLevel(lvl)
-            if #list == 0 then rows[#rows + 1] = { text = "|cff888888Ninguna en rango ahora mismo.|r" } end
-            for _, d in ipairs(list) do
-                local done = SG.DungeonTracker:CharDone(SG:MyName(), d.id)
-                local cands = SG.DungeonHelper:Candidates(d)
-                local online = 0
-                for _, c in ipairs(cands) do if c.online then online = online + 1 end end
-                rows[#rows + 1] = {
-                    text = d.name .. " |cff999999(" .. d.min .. "-" .. d.max .. ")|r" .. (done and " " .. CHECK or ""),
-                    right = online .. " compis online",
-                    button = { text = "Buscar grupo", width = 100, onClick = function() SG.DungeonHelper:Announce(d) end },
-                }
-            end
-            return rows
-        end },
-    })
-end
+-- PvE oculto de momento: pestaña de mazmorras comentada para poder recuperarla
+-- local function buildDungeons(parent)
+--     return makeRankingPanel(parent, {
+--         { text = "Ranking", rows = function()
+--             local rows = { { text = "Mazmorras completadas", header = true } }
+--             for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountDungeons(a) end),
+--                 function(v) return num(v) .. "  |cffb48cff" .. SG.Milestones:RankName(SG.Texts.dungeonRanks, v) .. "|r" end)) do rows[#rows + 1] = r end
+--             return rows
+--         end },
+--         { text = "Para mi nivel", rows = function()
+--             local lvl = UnitLevel("player")
+--             local rows = { { text = "Mazmorras para nivel " .. lvl, header = true } }
+--             local list = SG.DungeonHelper:ForLevel(lvl)
+--             if #list == 0 then rows[#rows + 1] = { text = "|cff888888Ninguna en rango ahora mismo.|r" } end
+--             for _, d in ipairs(list) do
+--                 local done = SG.DungeonTracker:CharDone(SG:MyName(), d.id)
+--                 local cands = SG.DungeonHelper:Candidates(d)
+--                 local online = 0
+--                 for _, c in ipairs(cands) do if c.online then online = online + 1 end end
+--                 rows[#rows + 1] = {
+--                     text = d.name .. " |cff999999(" .. d.min .. "-" .. d.max .. ")|r" .. (done and " " .. CHECK or ""),
+--                     right = online .. " compis online",
+--                     button = { text = "Buscar grupo", width = 100, onClick = function() SG.DungeonHelper:Announce(d) end },
+--                 }
+--             end
+--             return rows
+--         end },
+--     })
+-- end
 
 local function buildPlaytime(parent)
     return makeRankingPanel(parent, {
@@ -246,7 +248,7 @@ end
 local eventForm
 local function buildEventForm()
     local f = CreateFrame("Frame", "SolfaGuildEventForm", UIParent, "BasicFrameTemplateWithInset")
-    f:SetSize(420, 470)
+    f:SetSize(420, 444)  -- 470 con el filtro de mazmorras (PvE oculto)
     f:SetPoint("CENTER", 220, 0)
     f:SetFrameStrata("DIALOG")
     f:EnableMouse(true); f:SetMovable(true); f:RegisterForDrag("LeftButton")
@@ -280,7 +282,7 @@ local function buildEventForm()
     f.minLevel = field("Nivel mínimo", 40, true)
     f.maxLevel = field("Nivel máximo", 40, true)
     f.minPvp = field("Rango PvP mín. (1-" .. #SG.Texts.pvpRanks .. ")", 40, true)
-    f.minDung = field("Rango mazm. mín. (1-" .. #SG.Texts.dungeonRanks .. ")", 40, true)
+    -- f.minDung = field("Rango mazm. mín. (1-" .. #SG.Texts.dungeonRanks .. ")", 40, true)  -- PvE oculto
 
     local cl = W:Label(f, "Clases (ninguna marcada = todas):", "GameFontNormalSmall")
     cl:SetPoint("TOPLEFT", 16, y); y = y - 18
@@ -313,7 +315,7 @@ local function buildEventForm()
         filter.minLevel = n(f.minLevel)
         filter.maxLevel = n(f.maxLevel)
         filter.minPvp = n(f.minPvp)
-        filter.minDung = n(f.minDung)
+        -- filter.minDung = n(f.minDung)  -- PvE oculto
         local classes = {}
         for _, cb in ipairs(f.classChecks) do if cb:GetChecked() then classes[cb.class] = true end end
         if next(classes) then filter.classes = classes end
@@ -324,7 +326,7 @@ local function buildEventForm()
     create:SetPoint("BOTTOM", 0, 14)
 
     function f:Reset()
-        for _, e in ipairs({ f.title, f.desc, f.rank, f.minLevel, f.maxLevel, f.minPvp, f.minDung }) do e:SetText("") end
+        for _, e in ipairs({ f.title, f.desc, f.rank, f.minLevel, f.maxLevel, f.minPvp }) do e:SetText("") end
         f.date:SetText(date("%d/%m/%Y", time() + 86400))
         f.time:SetText("21:00")
         for _, cb in ipairs(f.classChecks) do cb:SetChecked(false) end
@@ -378,8 +380,9 @@ end
 -- Pestaña: GM
 ---------------------------------------------------------------------------
 local FEATURE_NAMES = {
-    { "pvp", "Rangos PvP" }, { "gold", "Hitos de oro" }, { "dungeons", "Hitos de mazmorras" },
-    { "playtime", "Ranking de tiempo" }, { "dungeonHelper", "Ayudante de mazmorras" },
+    { "pvp", "Rangos PvP" }, { "gold", "Hitos de oro" },
+    -- { "dungeons", "Hitos de mazmorras" }, { "dungeonHelper", "Ayudante de mazmorras" },  -- PvE oculto
+    { "playtime", "Ranking de tiempo" },
     { "whisperIcon", "Nota musical en susurros" }, { "inviteIcon", "Aviso de invitaciones" },
     { "zoneNotify", "Aviso de zona" }, { "events", "Eventos" }, { "campSOS", "SOS por campeo" },
 }
@@ -519,7 +522,7 @@ end
 -- Ventana
 ---------------------------------------------------------------------------
 local BUILDERS = {
-    profile = buildProfile, pvp = buildPvP, gold = buildGold, dungeons = buildDungeons,
+    profile = buildProfile, pvp = buildPvP, gold = buildGold, -- dungeons = buildDungeons,  -- PvE oculto
     playtime = buildPlaytime, events = buildEvents, admin = buildAdmin,
 }
 
