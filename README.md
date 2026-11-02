@@ -31,6 +31,9 @@ Todos los mensajes, rangos y umbrales están en `Data/Texts.lua`. Marcadores: `%
 ## Pendiente / por revisar en Forever
 - Comprobar en el cliente de Forever los niveles y las misiones de cada mazmorra en `Data/Dungeons.lua` (de momento solo hay misiones en las 4 primeras; faltan coordenadas para los waypoints).
 - Comprobar los NPC IDs de los jefes finales.
+- Poner en `## Interface:` de `SolfaGuild.toc` el número real del cliente de Forever (`/dump (select(4, GetBuildInfo()))`); `16001` es una suposición.
+- Semana: comprobar que en Forever existe `C_DateAndTime.GetSecondsUntilWeeklyReset` y que el reinicio semanal es el miércoles. Si la API no existe, el addon usa el miércoles a las 05:00 (hora del PC).
+- PvP: comprobar que el registro de combate marca bien a los jugadores enemigos (hostiles) y a los aliados que no van en tu grupo; de eso dependen los asesinatos y los asesinatos coordinados.
 - Probar la creación en el calendario del WoW (depende de la API del cliente y de los permisos de guild).
 - SOS por campeo: comprobar en Forever que al morir salta `PLAYER_DEAD` y que el registro de combate marca como hostiles a los jugadores enemigos; que el addon puede salir del grupo, invitar y aceptar invitaciones solo (sin que el juego lo bloquee); y si Forever pasa el grupo a banda solo al invitar al 6º jugador o, como en Classic Era, hay que convertirlo (el addon lo convierte él mismo, así que funciona en los dos casos). Ver también si, yendo solo, el juego deja tener más de 4 invitaciones pendientes a la vez o rechaza las que sobran (si las rechaza, el addon las repite al pasar a banda).
 
