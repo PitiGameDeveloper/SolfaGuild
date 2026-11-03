@@ -35,3 +35,5 @@
   ni `CLAUDE.md`) y un `release.json` (formato del packager de BigWigs) con los flavors `classic` y `forever`,
   que es lo que lee WowUp para elegir el zip. La `## Version:` del `.toc` se pone sola a partir de la etiqueta.
 - Pendiente en Forever: comprobar que WowUp reconoce el cliente como *Forever* (apuntado en el `README.md`).
+- El GM también lo instala con WowUp: **no crear enlaces/junctions** de la carpeta del proyecto en
+  `Interface\AddOns` (el que había en `_classic_era_` se quitó). Los cambios llegan al juego publicando versión.
