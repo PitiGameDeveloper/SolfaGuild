@@ -1,0 +1,60 @@
+# Crea una release de GitHub (zip + release.json) al subir una etiqueta "v*", para instalar con WowUp.
+# Uso: git tag v0.1.1 && git push origin v0.1.1
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Empaquetar
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          ZIP="SolfaGuild-${TAG}.zip"
+
+          # Copia solo lo que va dentro del juego, en una carpeta SolfaGuild/
+          mkdir -p build/SolfaGuild
+          git archive HEAD | tar -x -C build/SolfaGuild
+          rm -rf build/SolfaGuild/.github build/SolfaGuild/.gitignore build/SolfaGuild/CLAUDE.md
+          sed -i "s/^## Version:.*/## Version: ${VERSION}/" build/SolfaGuild/SolfaGuild.toc
+          (cd build && zip -r -9 "../${ZIP}" SolfaGuild)
+
+          # release.json (formato del packager de BigWigs): WowUp lo usa para elegir el zip según el cliente.
+          # El mismo zip vale para Classic Era (flavor "classic") y Forever (flavor "forever").
+          INTERFACE=$(grep -m1 '^## Interface:' SolfaGuild.toc | sed 's/^## Interface://' | tr ',' '\n' | tr -d ' \r' | sort -n | tail -1)
+          cat > release.json <<EOF
+          {
+            "releases": [
+              {
+                "name": "SolfaGuild",
+                "version": "${TAG}",
+                "filename": "${ZIP}",
+                "nolib": false,
+                "metadata": [
+                  { "flavor": "classic", "interface": ${INTERFACE} },
+                  { "flavor": "forever", "interface": ${INTERFACE} }
+                ]
+              }
+            ]
+          }
+          EOF
+          cat release.json
+          echo "ZIP=${ZIP}" >> "$GITHUB_ENV"
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" "${ZIP}" release.json \
+            --title "SolfaGuild ${GITHUB_REF_NAME}" --generate-notes

@@ -5,6 +5,14 @@ Addon de guild para **Los Solfamidas** (WoW Forever, Horda). Es para pasarlo bie
 > **IMPORTANTE: este addon es para WoW Forever (sale el 4 de noviembre de 2026).** Classic Era solo se usa para probarlo antes de que salga. Todo lo que se implemente tiene que funcionar en Forever; lo que pueda cambiar entre los dos clientes se apunta en *Pendiente / por revisar en Forever*. Más detalles en `CLAUDE.md`.
 
 ## Instalación
+### Con WowUp (recomendado)
+No hace falta cuenta de GitHub. En WowUp, con el cliente de Forever (o Classic Era) seleccionado: *Obtener addons → Instalar desde URL* → `https://github.com/PitiGameDeveloper/SolfaGuild`.
+
+WowUp avisará de las actualizaciones como con cualquier otro addon.
+
+**Publicar una versión nueva** (GM): `git tag v0.1.1 && git push origin v0.1.1`. GitHub Actions crea la release con el zip y un `release.json` (flavors `classic` y `forever`), que es lo que lee WowUp. La versión del `.toc` se pone sola a partir de la etiqueta.
+
+### A mano
 Copia la carpeta `SolfaGuild` en `World of Warcraft\_classic_era_\Interface\AddOns\` (o la carpeta de AddOns del cliente de Forever).
 Si el juego dice que el addon está "desactualizado", cambia el número de `## Interface:` de `SolfaGuild.toc` por el de tu cliente (`/dump (select(4, GetBuildInfo()))`).
 
@@ -36,6 +44,7 @@ Todos los mensajes, rangos y umbrales están en `Data/Texts.lua`. Marcadores: `%
 
 ## Pendiente / por revisar en Forever
 - Poner en `## Interface:` de `SolfaGuild.toc` el número real del cliente de Forever (`/dump (select(4, GetBuildInfo()))`); `16001` es una suposición.
+- WowUp: comprobar que reconoce la carpeta de Forever como cliente *Forever* y que instala/actualiza SolfaGuild desde la URL (usa el flavor `forever` del `release.json`; si no, revisar `.github/workflows/release.yml`).
 - Semana: comprobar que en Forever existe `C_DateAndTime.GetSecondsUntilWeeklyReset` y que el reinicio semanal es el miércoles. Si la API no existe, el addon usa el miércoles a las 05:00 (hora del PC).
 - PvP: comprobar que el registro de combate marca bien a los jugadores enemigos (hostiles) y a los aliados que no van en tu grupo; de eso dependen los asesinatos y los asesinatos coordinados.
 - Probar la creación en el calendario del WoW (depende de la API del cliente y de los permisos de guild).
