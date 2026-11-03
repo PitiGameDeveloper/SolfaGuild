@@ -30,15 +30,27 @@ function D:Complete(d)
     SG.Milestones:Check("dung", SG.Texts.dungeonRanks, total, "HITO DE MAZMORRAS", { dungeon = d.name })
 end
 
-SG:On("COMBAT_LOG_EVENT_UNFILTERED", function()
+-- El registro de combate solo se escucha dentro de mazmorras y bandas (fuera no
+-- hay jefes que contar), y lo único que se mira es si alguien ha muerto.
+local cl = CreateFrame("Frame")
+cl:SetScript("OnEvent", function()
     local _, sub, _, _, _, _, _, destGUID = CombatLogGetCurrentEventInfo()
     if sub ~= "UNIT_DIED" then return end
     local id = npcId(destGUID)
     local d = id and SG.DungeonByBoss[id]
-    if not d then return end
-    local inInstance, kind = IsInInstance()
-    if inInstance and (kind == "party" or kind == "raid") then D:Complete(d) end
+    if d then SG:Try(D.Complete, D, d) end
 end)
+
+local function updateListening()
+    local inInstance, kind = IsInInstance()
+    if inInstance and (kind == "party" or kind == "raid") then
+        cl:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    else
+        cl:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    end
+end
+SG:On("PLAYER_ENTERING_WORLD", updateListening)
+SG:On("ZONE_CHANGED_NEW_AREA", updateListening)
 
 -- ¿Ha completado este personaje la mazmorra? (nil = desconocido / sin addon)
 function D:CharDone(charName, dungeonId)

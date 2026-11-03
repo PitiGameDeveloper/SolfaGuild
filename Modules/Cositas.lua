@@ -228,7 +228,7 @@ end
 -- Valor de una categoría para una cuenta (suma de sus personajes; la sesión
 -- más larga es la mayor de todos ellos)
 function Cos:Value(acc, key)
-    if key == "played" then return SG:AccountSum(acc, "played") end
+    if key == "played" or key == "earned" then return SG:AccountSum(acc, key) end
     local total = 0
     for _, c in pairs(acc.chars or {}) do
         local v = type(c.cositas) == "table" and tonumber(c.cositas[key]) or 0

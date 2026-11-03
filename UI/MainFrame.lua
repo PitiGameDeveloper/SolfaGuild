@@ -11,11 +11,12 @@ local frame, tabs, panels, current = nil, {}, {}, nil
 local SKULL = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_8:12:12|t"
 local CROWN = "Interface\\GroupFrame\\UI-Group-LeaderIcon"
 local CHECK = "|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t"
+local DRAGON = "|TInterface\\Icons\\INV_Misc_Head_Dragon_01:12:12|t"   -- mazmorras
+local TAB_W, TAB_MARGIN = 90, 12
 local TAB_ORDER = {
     { key = "profile",  text = "Perfil" },
     { key = "pvp",      text = "PvP" },
-    -- { key = "dungeons", text = "PvE" },  -- PvE oculto de momento
-    { key = "gold",     text = "Oro" },
+    { key = "dungeons", text = "PvE" },
     { key = "cositas",  text = "Cositas" },
     { key = "events",   text = "Eventos" },
     { key = "admin",    text = "GM" },
@@ -24,6 +25,27 @@ local TAB_ORDER = {
 ---------------------------------------------------------------------------
 -- Helpers de ranking
 ---------------------------------------------------------------------------
+local function num(v) return "|cffffffff" .. SG.Thousands(v) .. "|r" end
+local function you(acc) return acc.mine and " |cff88ff88(tú)|r" or "" end
+
+-- Valor de una categoría de Cositas con su formato (número, tiempo u oro)
+local function cosValue(cat, v)
+    if cat.money then return SG:FormatMoney(v, true) end
+    if cat.time then return "|cffffffff" .. SG:FormatTime(v, true) .. "|r" end
+    return num(v)
+end
+
+-- Oro de un personaje solo en monedas de oro (para que quepa en media ventana)
+local function goldOnly(copper)
+    return "|cffffd700" .. SG.Thousands(math.floor((tonumber(copper) or 0) / 10000)) .. "o|r"
+end
+
+local function charDungeons(c)
+    local total = 0
+    for _, k in pairs(c.dungeons or {}) do total = total + k end
+    return total
+end
+
 -- Cada jugador sale solo con su main, que engloba las estadísticas de todos sus personajes
 local function rankingRows(list, formatter)
     local rows = {}
@@ -74,7 +96,7 @@ local function buildProfile(parent)
     local p = CreateFrame("Frame", nil, parent)
     p:SetAllPoints()
 
-    -- Bloque grande de PvP (el de PvE, a la derecha, está oculto de momento)
+    -- Bloques grandes de PvP y PvE
     local function block(x, title)
         local b = {}
         b.title = W:BigLabel(p, 30, 1, 0.82, 0)
@@ -88,13 +110,16 @@ local function buildProfile(parent)
         b.week:SetPoint("TOP", p, "TOP", x + 40, -122)
         return b
     end
-    local pvp = block(0, "PvP")
-    -- local pvp = block(-165, "PvP")
-    -- local pve = block(165, "PvE")
+    local pvp = block(-165, "PvP")
+    local pve = block(165, "PvE")
 
+    -- abajo, dos listas iguales: tus personajes y las Cositas que lideras
     p.list = W:List(p, true)
     p.list:SetPoint("TOPLEFT", 8, -160)
-    p.list:SetPoint("BOTTOMRIGHT", -8, 8)
+    p.list:SetPoint("BOTTOMRIGHT", p, "BOTTOM", -4, 8)
+    p.wins = W:List(p, true)
+    p.wins:SetPoint("TOPLEFT", p, "TOP", 4, -160)
+    p.wins:SetPoint("BOTTOMRIGHT", -8, 8)
 
     function p:Refresh()
         local t = SG.Milestones:MyTotals()
@@ -102,9 +127,9 @@ local function buildProfile(parent)
         pvp.rank:SetText(SG.PvP:LadderRankOf(t.acc) or "Sin rango")
         pvp.total:SetText(t.kills .. " asesinatos")
         pvp.week:SetText(t.killsWeek .. " esta semana")
-        -- pve.rank:SetText(M:RankName(T.dungeonRanks, t.dungeons))
-        -- pve.total:SetText(t.dungeons .. " dungeons")
-        -- pve.week:SetText(t.dungeonsWeek .. " esta semana")
+        pve.rank:SetText(M:RankName(T.dungeonRanks, t.dungeons))
+        pve.total:SetText(t.dungeons .. " dungeons")
+        pve.week:SetText(t.dungeonsWeek .. " esta semana")
 
         local rows = { { text = "Tus personajes", header = true } }
         -- por nivel y, si empatan, por tiempo jugado
@@ -124,13 +149,29 @@ local function buildProfile(parent)
             rows[#rows + 1] = {
                 text = SG:ClassColor(c.class) .. name .. "|r" .. (c.level and (" (" .. c.level .. ")") or "")
                     .. (isMain and "  |cffffd100main|r" or ""),
-                right = SG:FormatMoney(c.earned or 0, true) .. "  |cffff5555" .. (c.kills or 0) .. "|r " .. SKULL,
+                right = goldOnly(c.earned) .. "  |cffff5555" .. (c.kills or 0) .. "|r " .. SKULL
+                    .. "  |cffb48cff" .. charDungeons(c) .. "|r " .. DRAGON,
+                tooltip = { SG:ClassColor(c.class) .. name .. "|r", "Oro acumulado: " .. SG:FormatMoney(c.earned or 0, true),
+                    "Asesinatos: " .. (c.kills or 0), "Mazmorras: " .. charDungeons(c) },
                 icon = { texture = CROWN, disabled = isMain, dim = not isMain,  -- dorada solo la del main
                     tooltip = isMain and "Este es tu main" or "Hacer main",
                     onClick = function() SG:SetMain(name); p:Refresh() end },
             }
         end
         self.list:SetRows(rows)
+
+        local wins = { { text = "Cositas en las que eres el mejor", header = true } }
+        for _, it in ipairs(SG.Cositas:Board()) do
+            if it.best and it.best.acc.mine then
+                wins[#wins + 1] = {
+                    text = "|cffffd100" .. SG:Fmt(it.cat.title) .. "|r",
+                    right = cosValue(it.cat, it.best.value),
+                    tooltip = { "|cffffd100" .. SG:Fmt(it.cat.title) .. "|r", SG:Fmt(it.cat.desc) },
+                }
+            end
+        end
+        if #wins == 1 then wins[2] = { text = "|cff888888eres un chingao|r" } end
+        self.wins:SetRows(wins)
     end
     return p
 end
@@ -138,10 +179,7 @@ end
 ---------------------------------------------------------------------------
 -- Pestañas de ranking
 ---------------------------------------------------------------------------
-local function num(v) return "|cffffffff" .. SG.Thousands(v) .. "|r" end
-
 local INDENT = "      "
-local function you(acc) return acc.mine and " |cff88ff88(tú)|r" or "" end
 
 -- Las tres listas de PvP; week = true para contar solo esta semana
 local function pvpRows(week)
@@ -190,46 +228,34 @@ local function buildPvP(parent)
     })
 end
 
-local function buildGold(parent)
-    local function money(v) return SG:FormatMoney(v, true) end
+local function buildDungeons(parent)
     return makeRankingPanel(parent, {
-        { text = "Acumulado", rows = function()
-            local rows = { { text = "Oro acumulado (todos los personajes del jugador)", header = true } }
-            for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountSum(a, "earned") end), money)) do rows[#rows + 1] = r end
+        { text = "Ranking", rows = function()
+            local rows = { { text = "Mazmorras completadas", header = true } }
+            for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountDungeons(a) end),
+                function(v) return num(v) .. "  |cffb48cff" .. SG.Milestones:RankName(SG.Texts.dungeonRanks, v) .. "|r" end)) do rows[#rows + 1] = r end
+            return rows
+        end },
+        { text = "Para mi nivel", rows = function()
+            local lvl = UnitLevel("player")
+            local rows = { { text = "Mazmorras para nivel " .. lvl, header = true } }
+            local list = SG.DungeonHelper:ForLevel(lvl)
+            if #list == 0 then rows[#rows + 1] = { text = "|cff888888Ninguna en rango ahora mismo.|r" } end
+            for _, d in ipairs(list) do
+                local done = SG.DungeonTracker:CharDone(SG:MyName(), d.id)
+                local cands = SG.DungeonHelper:Candidates(d)
+                local online = 0
+                for _, c in ipairs(cands) do if c.online then online = online + 1 end end
+                rows[#rows + 1] = {
+                    text = d.name .. " |cff999999(" .. d.min .. "-" .. d.max .. ")|r" .. (done and " " .. CHECK or ""),
+                    right = online .. " compis online",
+                    button = { text = "Buscar grupo", width = 100, onClick = function() SG.DungeonHelper:Announce(d) end },
+                }
+            end
             return rows
         end },
     })
 end
-
--- PvE oculto de momento: pestaña de mazmorras comentada para poder recuperarla
--- local function buildDungeons(parent)
---     return makeRankingPanel(parent, {
---         { text = "Ranking", rows = function()
---             local rows = { { text = "Mazmorras completadas", header = true } }
---             for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountDungeons(a) end),
---                 function(v) return num(v) .. "  |cffb48cff" .. SG.Milestones:RankName(SG.Texts.dungeonRanks, v) .. "|r" end)) do rows[#rows + 1] = r end
---             return rows
---         end },
---         { text = "Para mi nivel", rows = function()
---             local lvl = UnitLevel("player")
---             local rows = { { text = "Mazmorras para nivel " .. lvl, header = true } }
---             local list = SG.DungeonHelper:ForLevel(lvl)
---             if #list == 0 then rows[#rows + 1] = { text = "|cff888888Ninguna en rango ahora mismo.|r" } end
---             for _, d in ipairs(list) do
---                 local done = SG.DungeonTracker:CharDone(SG:MyName(), d.id)
---                 local cands = SG.DungeonHelper:Candidates(d)
---                 local online = 0
---                 for _, c in ipairs(cands) do if c.online then online = online + 1 end end
---                 rows[#rows + 1] = {
---                     text = d.name .. " |cff999999(" .. d.min .. "-" .. d.max .. ")|r" .. (done and " " .. CHECK or ""),
---                     right = online .. " compis online",
---                     button = { text = "Buscar grupo", width = 100, onClick = function() SG.DungeonHelper:Announce(d) end },
---                 }
---             end
---             return rows
---         end },
---     })
--- end
 
 -- Cositas: una fila por categoría con el mejor; al pasar el ratón, de qué va y tu valor
 local function buildCositas(parent)
@@ -239,13 +265,13 @@ local function buildCositas(parent)
     p.list:SetPoint("TOPLEFT", 8, -4)
     p.list:SetPoint("BOTTOMRIGHT", -28, 8)
     function p:Refresh()
-        local rows = { { text = "Los mejores de la guild en cada cosa", right = "|cff999999pasa el ratón por encima|r", header = true } }
+        local rows = { { text = "\"Los pero del equipo\" Gorovat - 2016", right = "|cff999999pasa el ratón por encima|r", header = true } }
         if not SG:Feature("cositas") then
             rows[#rows + 1] = { text = "|cffff5555El GM ha desactivado las Cositas: no se cuenta nada nuevo.|r" }
         end
         for _, it in ipairs(SG.Cositas:Board()) do
             local cat = it.cat
-            local function fmt(v) return cat.time and ("|cffffffff" .. SG:FormatTime(v, true) .. "|r") or num(v) end
+            local function fmt(v) return cosValue(cat, v) end
             rows[#rows + 1] = {
                 text = "|cffffd100" .. SG:Fmt(cat.title) .. "|r",
                 right = it.best and (SG:ColoredMain(it.best.acc) .. you(it.best.acc) .. "   " .. fmt(it.best.value))
@@ -264,7 +290,7 @@ end
 local eventForm
 local function buildEventForm()
     local f = CreateFrame("Frame", "SolfaGuildEventForm", UIParent, "BasicFrameTemplateWithInset")
-    f:SetSize(420, 444)  -- 470 con el filtro de mazmorras (PvE oculto)
+    f:SetSize(420, 470)
     f:SetPoint("CENTER", 220, 0)
     f:SetFrameStrata("DIALOG")
     f:EnableMouse(true); f:SetMovable(true); f:RegisterForDrag("LeftButton")
@@ -298,7 +324,7 @@ local function buildEventForm()
     f.minLevel = field("Nivel mínimo", 40, true)
     f.maxLevel = field("Nivel máximo", 40, true)
     f.minPvp = field("Rango PvP mín. (1-" .. #SG.Texts.pvpRanks .. ")", 40, true)
-    -- f.minDung = field("Rango mazm. mín. (1-" .. #SG.Texts.dungeonRanks .. ")", 40, true)  -- PvE oculto
+    f.minDung = field("Rango mazm. mín. (1-" .. #SG.Texts.dungeonRanks .. ")", 40, true)
 
     local cl = W:Label(f, "Clases (ninguna marcada = todas):", "GameFontNormalSmall")
     cl:SetPoint("TOPLEFT", 16, y); y = y - 18
@@ -331,7 +357,7 @@ local function buildEventForm()
         filter.minLevel = n(f.minLevel)
         filter.maxLevel = n(f.maxLevel)
         filter.minPvp = n(f.minPvp)
-        -- filter.minDung = n(f.minDung)  -- PvE oculto
+        filter.minDung = n(f.minDung)
         local classes = {}
         for _, cb in ipairs(f.classChecks) do if cb:GetChecked() then classes[cb.class] = true end end
         if next(classes) then filter.classes = classes end
@@ -342,7 +368,7 @@ local function buildEventForm()
     create:SetPoint("BOTTOM", 0, 14)
 
     function f:Reset()
-        for _, e in ipairs({ f.title, f.desc, f.rank, f.minLevel, f.maxLevel, f.minPvp }) do e:SetText("") end
+        for _, e in ipairs({ f.title, f.desc, f.rank, f.minLevel, f.maxLevel, f.minPvp, f.minDung }) do e:SetText("") end
         f.date:SetText(date("%d/%m/%Y", time() + 86400))
         f.time:SetText("21:00")
         for _, cb in ipairs(f.classChecks) do cb:SetChecked(false) end
@@ -371,9 +397,12 @@ local function buildEvents(parent)
     p.list:SetPoint("TOPLEFT", 8, -32)
     p.list:SetPoint("BOTTOMRIGHT", -28, 8)
     function p:Refresh()
+        -- sin permiso no se ve ni el botón: la lista sube arriba del todo
         local can = SG:CanCreateEvents()
-        if can then self.create:Enable() else self.create:Disable() end
-        self.info:SetText(can and "Tienes permiso para crear eventos." or "|cff999999Solo los rangos/personas elegidos por el GM pueden crear eventos.|r")
+        self.create:SetShown(can)
+        self.info:SetShown(can)
+        self.info:SetText("Tienes permiso para crear eventos.")
+        self.list:SetPoint("TOPLEFT", 8, can and -32 or -4)
         local rows = { { text = "Próximos eventos", header = true } }
         for _, e in ipairs(SG.Events:Upcoming()) do
             local mine = SG.Events:MatchesMe(e)
@@ -397,7 +426,7 @@ end
 ---------------------------------------------------------------------------
 local FEATURE_NAMES = {
     { "pvp", "Rangos PvP" }, { "gold", "Hitos de oro" },
-    -- { "dungeons", "Hitos de mazmorras" }, { "dungeonHelper", "Ayudante de mazmorras" },  -- PvE oculto
+    { "dungeons", "Hitos de mazmorras" }, { "dungeonHelper", "Ayudante de mazmorras" },
     { "cositas", "Cositas" },
     { "whisperIcon", "Nota musical en susurros" }, { "inviteIcon", "Aviso de invitaciones" },
     { "zoneNotify", "Aviso de zona" }, { "events", "Eventos" }, { "campSOS", "SOS por campeo" },
@@ -538,9 +567,26 @@ end
 -- Ventana
 ---------------------------------------------------------------------------
 local BUILDERS = {
-    profile = buildProfile, pvp = buildPvP, gold = buildGold, -- dungeons = buildDungeons,  -- PvE oculto
+    profile = buildProfile, pvp = buildPvP, dungeons = buildDungeons,
     cositas = buildCositas, events = buildEvents, admin = buildAdmin,
 }
+
+-- Reparte las pestañas visibles por todo el ancho (la de GM solo la ve el GM, sin dejar hueco)
+local function layoutTabs()
+    local visible = {}
+    for _, t in ipairs(TAB_ORDER) do
+        local b = tabs[t.key]
+        local show = t.key ~= "admin" or SG:IsAdmin()
+        b:SetShown(show)
+        if show then visible[#visible + 1] = b end
+    end
+    local n = #visible
+    local gap = n > 1 and (frame:GetWidth() - 2 * TAB_MARGIN - n * TAB_W) / (n - 1) or 0
+    for i, b in ipairs(visible) do
+        b:ClearAllPoints()
+        b:SetPoint("BOTTOMLEFT", TAB_MARGIN + (i - 1) * (TAB_W + gap), 12)  -- pestañas abajo
+    end
+end
 
 local function build()
     frame = CreateFrame("Frame", "SolfaGuildFrame", UIParent, "BasicFrameTemplateWithInset")
@@ -561,8 +607,7 @@ local function build()
     body:SetPoint("BOTTOMRIGHT", -8, 40)
 
     for i, t in ipairs(TAB_ORDER) do
-        local b = W:Button(frame, t.text, 90, 24, function() UI:Show(t.key) end)
-        b:SetPoint("BOTTOMLEFT", 12 + (i - 1) * 93, 12)  -- pestañas abajo
+        local b = W:Button(frame, t.text, TAB_W, 24, function() UI:Show(t.key) end)
         tabs[t.key] = b
         local panel = BUILDERS[t.key](body)
         panel:Hide()
@@ -588,14 +633,14 @@ function UI:Show(key)
     for k, b in pairs(tabs) do
         if k == current then b:LockHighlight() else b:UnlockHighlight() end
     end
-    tabs.admin:SetShown(SG:IsAdmin())
+    layoutTabs()
     frame:Show()
     self:Refresh()
 end
 
 function UI:Refresh()
     if not frame or not frame:IsShown() then return end
-    tabs.admin:SetShown(SG:IsAdmin())
+    layoutTabs()
     local p = panels[current]
     if p and p.Refresh then p:Refresh() end
 end

@@ -91,7 +91,7 @@ T.dungeonRanks = {
 ---------------------------------------------------------------------------
 -- COSITAS: categorías de la pestaña "Cositas" (sale solo el mejor de cada una;
 -- la descripción se ve al pasar el ratón). key = dato que se cuenta (no tocar),
--- time = se muestra como tiempo. Se pueden reordenar, renombrar o quitar.
+-- time = se muestra como tiempo, money = como oro. Se pueden reordenar, renombrar o quitar.
 ---------------------------------------------------------------------------
 T.cositas = {
     { key = "fish",      title = "Chill guy",          desc = "Peces pescados." },
@@ -103,6 +103,7 @@ T.cositas = {
     { key = "respec",    title = "Meta chaser",        desc = "Veces que se ha reiniciado los talentos." },
     -- oculta hasta probar en Forever si hay peluquería (se sigue contando si existe el evento)
     -- { key = "barber",    title = "Estiloso",          desc = "Cambios de peinado en la peluquería." },
+    { key = "earned",    title = "Góblin avaro",       desc = "Oro acumulado (todo lo que han ganado sus personajes).", money = true },
     { key = "ah",        title = "Broker",             desc = "Subastas ganadas en la casa de subastas." },
     { key = "deaths",    title = "Críagusanos",        desc = "Veces muerto." },
     { key = "crafted",   title = "Manos callosas",     desc = "Objetos fabricados con profesiones." },

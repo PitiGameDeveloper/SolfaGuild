@@ -9,18 +9,17 @@
 Core.lua
 Comm.lua
 Data\Texts.lua
-# PvE/mazmorras oculto de momento (para recuperarlo, quitar el # de estas tres líneas)
-# Data\Dungeons.lua
+Data\Dungeons.lua
 Modules\Players.lua
 Modules\Settings.lua
 Modules\Popup.lua
 Modules\Milestones.lua
 Modules\PvP.lua
 Modules\Gold.lua
-# Modules\Dungeons.lua
+Modules\Dungeons.lua
 Modules\Playtime.lua
 Modules\Cositas.lua
-# Modules\DungeonHelper.lua
+Modules\DungeonHelper.lua
 Modules\Social.lua
 Modules\CampSOS.lua
 Modules\Events.lua
