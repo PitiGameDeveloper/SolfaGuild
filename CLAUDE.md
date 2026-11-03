@@ -14,6 +14,11 @@
 - No hay que decir "esto es para Classic Era" ni dar por hechas las reglas de Classic Era. Si no se sabe
   cómo funciona algo en Forever, se dice y se apunta como pendiente.
 
+## Mantener este archivo al día
+- Siempre que cambie algo sustancial en la manera de trabajar o en el proyecto (cómo se publica, decisiones
+  tomadas, estructura, reglas nuevas…) que haga falta saber en otras conversaciones, **actualiza este
+  `CLAUDE.md` automáticamente**, sin esperar a que lo pidan, y menciónalo en la respuesta.
+
 ## Otras notas
 - Todo el texto del juego y del código está en español.
 - Los textos editables están en `Data/Texts.lua`; los ajustes del GM (con sus valores por defecto) en
