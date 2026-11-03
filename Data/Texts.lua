@@ -88,6 +88,40 @@ T.dungeonRanks = {
       title = "¡100 mazmorras!", text = "%count%. Los Solfamidas componen canciones sobre tus runs." },
 }
 
+---------------------------------------------------------------------------
+-- COSITAS: categorías de la pestaña "Cositas" (sale solo el mejor de cada una;
+-- la descripción se ve al pasar el ratón). key = dato que se cuenta (no tocar),
+-- time = se muestra como tiempo. Se pueden reordenar, renombrar o quitar.
+---------------------------------------------------------------------------
+T.cositas = {
+    { key = "fish",      title = "Chill guy",          desc = "Peces pescados." },
+    { key = "boars",     title = "P.E.T.A.",           desc = "Jabalíes matados (golpe final tuyo o de tu mascota)." },
+    { key = "swim",      title = "Como pez en el agua", desc = "Tiempo nadando (sin estar ausente).", time = true },
+    { key = "played",    title = "Sudoroso",           desc = "Tiempo jugado (/played de todos los personajes).", time = true },
+    { key = "enemyLand", title = "Sediento de sangre", desc = "Tiempo en territorio de la %enemy% (sin contar zonas en disputa ni estando ausente).", time = true },
+    { key = "buffs",     title = "Colegón",            desc = "Bufos lanzados a otros jugadores." },
+    { key = "respec",    title = "Meta chaser",        desc = "Veces que se ha reiniciado los talentos." },
+    -- oculta hasta probar en Forever si hay peluquería (se sigue contando si existe el evento)
+    -- { key = "barber",    title = "Estiloso",          desc = "Cambios de peinado en la peluquería." },
+    { key = "ah",        title = "Broker",             desc = "Subastas ganadas en la casa de subastas." },
+    { key = "deaths",    title = "Críagusanos",        desc = "Veces muerto." },
+    { key = "crafted",   title = "Manos callosas",     desc = "Objetos fabricados con profesiones." },
+    { key = "group",     title = "FOMO",               desc = "Tiempo en grupo o banda.", time = true },
+    { key = "falls",     title = "Paracaidista",       desc = "Muertes por caída." },
+    { key = "ghost",     title = "Salvapantallas gris", desc = "Tiempo como fantasma, corriendo de vuelta al cadáver.", time = true },
+    { key = "leeroy",    title = "Leeeeroy Jenkins!",  desc = "Veces que ha sido el primero del grupo en morir." },
+    { key = "hugs",      title = "Sobón",              desc = "Abrazos, besos, caricias y demás arrumacos (/abrazar, /besar, /acariciar...)." },
+    { key = "inspect",   title = "Stalker",            desc = "Veces que ha inspeccionado a otros jugadores." },
+    { key = "rolls",     title = "Ludópata",           desc = "/roll tirados." },
+    { key = "need",      title = "Ninja",              desc = "Veces que ha elegido Necesidad al repartir botín." },
+    { key = "rez",       title = "Ángel de la guarda", desc = "Resurrecciones lanzadas a otros jugadores." },
+    { key = "heal",      title = "Ambulancia",         desc = "Curación hecha a otros jugadores (sin contar la que sobra)." },
+    { key = "mail",      title = "Cartero",            desc = "Correos enviados." },
+    { key = "herbs",     title = "Fumeta",             desc = "Hierbas recogidas." },
+    { key = "jumps",     title = "Bunny Hopper",       desc = "Saltos." },
+    { key = "session",   title = "Adicto al Monster",  desc = "La sesión de juego seguida más larga (sin desconectarse).", time = true },
+}
+
 T.ui = {
     popupButton = "¡A por ello!",
     zoneTitle = "Solfamidas en %zone%",

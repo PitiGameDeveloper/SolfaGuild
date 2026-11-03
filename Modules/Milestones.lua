@@ -24,6 +24,8 @@ end
 -- Comprueba un valor contra una lista de hitos y lanza las cartas pendientes.
 -- key: prefijo único ("pvp", "goldE", "goldH", "dung"). formatCount: fn(at) -> texto
 function M:Check(key, list, value, kicker, vars, formatCount)
+    -- mientras se recuperan los datos de la guild no sabemos qué hitos ya se celebraron
+    if SG.restoring then return end
     local done = SG.db.my.milestones
     for i, r in ipairs(list) do
         local k = key .. ":" .. r.at

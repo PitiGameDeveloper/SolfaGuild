@@ -166,13 +166,17 @@ function SG:FormatMoney(copper, colored)
     return string.format("%so %dp %dc", thousands(g), s, c)
 end
 
-function SG:FormatTime(seconds)
+-- withSeconds: añade los segundos (para desempatar en Cositas)
+function SG:FormatTime(seconds, withSeconds)
     seconds = math.floor(tonumber(seconds) or 0)
     local d = math.floor(seconds / 86400)
     local h = math.floor((seconds % 86400) / 3600)
     local m = math.floor((seconds % 3600) / 60)
-    if d > 0 then return string.format("%dd %dh %dm", d, h, m) end
-    return string.format("%dh %dm", h, m)
+    local out
+    if d > 0 then out = string.format("%dd %dh %dm", d, h, m)
+    else out = string.format("%dh %dm", h, m) end
+    if withSeconds then out = out .. string.format(" %ds", seconds % 60) end
+    return out
 end
 
 function SG:ClassColor(class)
@@ -263,6 +267,9 @@ function SG:InitDB()
     wipe(pendingErrors)
     if not self.db.accountId then
         self.db.accountId = self:RandomId(12)
+        -- datos vacíos (addon nuevo o WTF borrado): se intenta recuperar la
+        -- cuenta desde la guild antes de enviar nada (ver Players.lua)
+        self.restoring = true
     end
 end
 
@@ -298,6 +305,7 @@ function SG:MyChar()
         earned = 0,
         dungeons = {},
         played = 0,
+        cositas = {},
         updated = 0,
     })
     return c
@@ -353,6 +361,8 @@ local function slash(msg)
     elseif msg == "minimap" then
         SG.db.ui.hideMinimap = not SG.db.ui.hideMinimap
         SG:Fire("MINIMAP_TOGGLE")
+    elseif msg == "recuperar" then
+        SG:RequestRestore()
     elseif msg == "test" then
         SG:Fire("TEST_POPUP")
     elseif msg == "campeo" then

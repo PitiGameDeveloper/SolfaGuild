@@ -16,7 +16,7 @@ local TAB_ORDER = {
     { key = "pvp",      text = "PvP" },
     -- { key = "dungeons", text = "PvE" },  -- PvE oculto de momento
     { key = "gold",     text = "Oro" },
-    { key = "playtime", text = "Tiempo" },
+    { key = "cositas",  text = "Cositas" },
     { key = "events",   text = "Eventos" },
     { key = "admin",    text = "GM" },
 }
@@ -231,15 +231,31 @@ end
 --     })
 -- end
 
-local function buildPlaytime(parent)
-    return makeRankingPanel(parent, {
-        { text = "Más sudorosos", rows = function()
-            local rows = { { text = "Tiempo de juego total", header = true } }
-            for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountSum(a, "played") end),
-                function(v) return SG:FormatTime(v) end)) do rows[#rows + 1] = r end
-            return rows
-        end },
-    })
+-- Cositas: una fila por categoría con el mejor; al pasar el ratón, de qué va y tu valor
+local function buildCositas(parent)
+    local p = CreateFrame("Frame", nil, parent)
+    p:SetAllPoints()
+    p.list = W:List(p)
+    p.list:SetPoint("TOPLEFT", 8, -4)
+    p.list:SetPoint("BOTTOMRIGHT", -28, 8)
+    function p:Refresh()
+        local rows = { { text = "Los mejores de la guild en cada cosa", right = "|cff999999pasa el ratón por encima|r", header = true } }
+        if not SG:Feature("cositas") then
+            rows[#rows + 1] = { text = "|cffff5555El GM ha desactivado las Cositas: no se cuenta nada nuevo.|r" }
+        end
+        for _, it in ipairs(SG.Cositas:Board()) do
+            local cat = it.cat
+            local function fmt(v) return cat.time and ("|cffffffff" .. SG:FormatTime(v, true) .. "|r") or num(v) end
+            rows[#rows + 1] = {
+                text = "|cffffd100" .. SG:Fmt(cat.title) .. "|r",
+                right = it.best and (SG:ColoredMain(it.best.acc) .. you(it.best.acc) .. "   " .. fmt(it.best.value))
+                    or "|cff888888nadie aún|r",
+                tooltip = { "|cffffd100" .. SG:Fmt(cat.title) .. "|r", SG:Fmt(cat.desc), " ", "|cff88ff88Tú:|r " .. fmt(it.mine) },
+            }
+        end
+        self.list:SetRows(rows)
+    end
+    return p
 end
 
 ---------------------------------------------------------------------------
@@ -382,7 +398,7 @@ end
 local FEATURE_NAMES = {
     { "pvp", "Rangos PvP" }, { "gold", "Hitos de oro" },
     -- { "dungeons", "Hitos de mazmorras" }, { "dungeonHelper", "Ayudante de mazmorras" },  -- PvE oculto
-    { "playtime", "Ranking de tiempo" },
+    { "cositas", "Cositas" },
     { "whisperIcon", "Nota musical en susurros" }, { "inviteIcon", "Aviso de invitaciones" },
     { "zoneNotify", "Aviso de zona" }, { "events", "Eventos" }, { "campSOS", "SOS por campeo" },
 }
@@ -523,7 +539,7 @@ end
 ---------------------------------------------------------------------------
 local BUILDERS = {
     profile = buildProfile, pvp = buildPvP, gold = buildGold, -- dungeons = buildDungeons,  -- PvE oculto
-    playtime = buildPlaytime, events = buildEvents, admin = buildAdmin,
+    cositas = buildCositas, events = buildEvents, admin = buildAdmin,
 }
 
 local function build()

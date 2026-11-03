@@ -19,6 +19,7 @@ Modules\PvP.lua
 Modules\Gold.lua
 # Modules\Dungeons.lua
 Modules\Playtime.lua
+Modules\Cositas.lua
 # Modules\DungeonHelper.lua
 Modules\Social.lua
 Modules\CampSOS.lua

@@ -24,9 +24,13 @@ end
 local function seed(c, money)
     c.earned = (c.earned or 0) + money
     c.goldSeeded = true
+    c.seededWith = money   -- para no contarlo dos veces si luego se recupera la cuenta
     SG:MarkDirty()
     checkMilestones()
 end
+
+-- al acabar la recuperación de datos se miran los hitos que se saltaron
+SG:Listen("RESTORE_DONE", function() checkMilestones() end)
 
 function Gold:OnLogin()
     last = GetMoney()

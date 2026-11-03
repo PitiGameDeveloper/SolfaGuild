@@ -127,6 +127,7 @@ function SG:BuildMyProfile(public)
             kills = c.kills, killsWeek = c.killsWeek, dungeonsWeek = c.dungeonsWeek, weekKey = c.weekKey,
             earned = (not public) and c.earned or nil,
             played = c.played,
+            cositas = c.cositas,
             dungeons = c.dungeons, zones = c.zones, zonesWeek = c.zonesWeek,
             teams = topN(c.teams, 15), teamsWeek = topN(c.teamsWeek, 15),
         }
@@ -260,7 +261,8 @@ local dirty = false
 function SG:MarkDirty() dirty = true end
 
 function SG:BroadcastProfile(channel, target)
-    if not IsInGuild() then return end
+    -- recuperando datos: no enviamos una cuenta nueva a cero que tape a la buena
+    if not IsInGuild() or self.restoring then return end
     local p = self:BuildMyProfile(true)
     p.t = "PROF"
     Comm:Send(p, channel or "GUILD", target)
@@ -285,6 +287,96 @@ local function storeAccount(p, sender)
         gdb.gmAccount = p.id
     end
     return true
+end
+
+---------------------------------------------------------------------------
+-- Recuperación: si este PC empieza con los datos vacíos (WTF borrado), el
+-- HELLO lleva "fresh" y quien tenga la cuenta de este personaje se la manda
+-- (RELAY). Se adopta la cuenta (id, main, personajes, oro, hitos) y se le
+-- suma lo hecho desde que se entró. El juego garantiza quién envía cada
+-- mensaje, así que solo puede recuperar una cuenta quien juega uno de sus
+-- personajes.
+-- Si en RESTORE_WINDOW no llega nada (nadie conectado), se sigue como cuenta
+-- nueva pero la recuperación queda pendiente (db.my.restorePending) durante
+-- RESTORE_DAYS: en cada entrada se vuelve a pedir y, si llega, se juntan las
+-- dos. "/sg recuperar" la vuelve a pedir a mano.
+---------------------------------------------------------------------------
+local RESTORE_WINDOW = 30   -- segundos tras entrar esperando la cuenta antigua
+local RESTORE_DAYS = 60     -- días que se sigue intentando
+
+local function addTo(dst, src)
+    for k, v in pairs(type(src) == "table" and src or {}) do
+        if type(v) == "number" then dst[k] = (dst[k] or 0) + v end
+    end
+end
+
+local function n(v) return tonumber(v) or 0 end
+
+local function restoreFrom(p)
+    local db, me, wk, g = SG.db, SG:MyName(), SG:WeekKey(), SG:GuildName()
+    SG.restoring = false
+    db.my.restorePending = nil
+    -- la cuenta provisional queda en la guild con lo mismo que ya llevamos: no se recupera nunca
+    db.my.formerIds = db.my.formerIds or {}
+    db.my.formerIds[db.accountId] = true
+    db.accountId = p.id
+    if type(p.main) == "string" then db.my.main = p.main end
+    for k, v in pairs(type(p.milestones) == "table" and p.milestones or {}) do
+        if db.my.milestones[k] == nil then db.my.milestones[k] = v end
+    end
+    for name, old in pairs(p.chars) do
+        if type(old) == "table" then
+            local c = db.my.chars[name] or {}
+            db.my.chars[name] = c
+            c.class = c.class or old.class
+            c.level = math.max(n(c.level), n(old.level))
+            c.guild = c.guild or g
+            c.played = math.max(n(c.played), n(old.played))
+            c.kills = n(c.kills) + n(old.kills)
+            for _, f in ipairs({ "zones", "teams", "dungeons" }) do
+                c[f] = c[f] or {}
+                addTo(c[f], old[f])
+            end
+            -- se conserva la misma tabla: Cositas la tiene apuntada
+            c.cositas = c.cositas or {}
+            local session = math.max(n(c.cositas.session), n(type(old.cositas) == "table" and old.cositas.session))
+            addTo(c.cositas, old.cositas)
+            c.cositas.session = session
+            SG:CheckWeek(c)
+            if old.weekKey == wk then
+                c.killsWeek = n(c.killsWeek) + n(old.killsWeek)
+                c.dungeonsWeek = n(c.dungeonsWeek) + n(old.dungeonsWeek)
+                c.zonesWeek = c.zonesWeek or {}; addTo(c.zonesWeek, old.zonesWeek)
+                c.teamsWeek = c.teamsWeek or {}; addTo(c.teamsWeek, old.teamsWeek)
+            end
+            -- del oro solo viaja el total de la cuenta (va a este personaje); a
+            -- cada uno se le quita el oro que llevaba encima al empezar de cero
+            c.earned = math.max(0, n(c.earned) - n(c.seededWith))
+            c.seededWith = nil
+            c.goldSeeded = true
+        end
+    end
+    local c = db.my.chars[me]
+    c.earned = n(c.earned) + n(p.earned)
+    local gdb = SG:GuildDB()
+    if gdb then gdb.accounts[p.id] = nil end
+    SG:Print("Datos recuperados de la guild: vuelves a ser " .. tostring(db.my.main) .. ".")
+    SG:Fire("RESTORE_DONE")
+    SG:MarkDirty()
+    SG:BroadcastProfile()
+    SG:Fire("DATA_UPDATED")
+end
+
+-- Cuenta guardada que contiene a este personaje (la más reciente)
+local function accountWith(gdb, name, exceptId, skip)
+    local best, bestId
+    for id, acc in pairs(gdb.accounts) do
+        if id ~= exceptId and not (skip and skip[id]) and type(acc.chars) == "table" and acc.chars[name]
+            and (not best or (acc.updated or 0) > (best.updated or 0)) then
+            best, bestId = acc, id
+        end
+    end
+    return best, bestId
 end
 
 -- Elección simple: responde a los HELLO el usuario online con nombre menor
@@ -317,6 +409,17 @@ Comm:Register("HELLO", function(msg, sender)
             SG:Fire("HELLO_RELAY", msg, sender)
         end)
     end
+    -- datos vacíos: le mando su cuenta si la tengo
+    if msg.fresh and gdb then
+        local acc, id = accountWith(gdb, sender, msg.id)
+        if acc then
+            C_Timer.After(1 + math.random() * 3, function()
+                Comm:Send({ t = "RELAY", id = id, main = acc.main, chars = acc.chars,
+                    updated = acc.updated, milestones = acc.milestones,
+                    earned = acc.earned }, "WHISPER", sender)
+            end)
+        end
+    end
     SG:Fire("HELLO_RECEIVED", msg, sender)
 end)
 
@@ -326,7 +429,44 @@ Comm:Register("PROF", function(msg, sender)
     if storeAccount(msg, sender) then SG:Fire("DATA_UPDATED") end
 end)
 
+local function wantsRestore()
+    local pending = SG.db.my.restorePending
+    if pending and SG:Now() - pending > RESTORE_DAYS * 86400 then
+        SG.db.my.restorePending, pending = nil, nil
+    end
+    return SG.restoring or pending ~= nil
+end
+
+local function canRestoreFrom(id)
+    local former = SG.db.my.formerIds
+    return type(id) == "string" and id ~= SG.db.accountId and not (former and former[id])
+end
+
+-- Recuperación pendiente: ¿ya tengo guardada la cuenta antigua? (llega con los RELAY)
+function SG:TryRestoreStored()
+    if not wantsRestore() then return false end
+    local gdb = self:GuildDB()
+    if not gdb then return false end
+    local acc, id = accountWith(gdb, self:MyName(), self.db.accountId, self.db.my.formerIds)
+    if not acc then return false end
+    restoreFrom({ id = id, main = acc.main, chars = acc.chars, milestones = acc.milestones, earned = acc.earned })
+    return true
+end
+
+-- "/sg recuperar": vuelve a pedir a la guild la cuenta de este personaje
+function SG:RequestRestore()
+    self.db.my.restorePending = self:Now()
+    if self:TryRestoreStored() then return end
+    self:Print("Pidiendo tus datos a la guild... Si alguien conectado los tiene, te llegarán en unos segundos.")
+    self:SendHello()
+end
+
 Comm:Register("RELAY", function(msg, sender)
+    if wantsRestore() and canRestoreFrom(msg.id) and type(msg.chars) == "table"
+        and type(msg.chars[SG:MyName()]) == "table" and SG:IsGuildMember(sender) then
+        restoreFrom(msg)
+        return
+    end
     if storeAccount(msg, nil) then SG:Fire("DATA_UPDATED") end
 end)
 
@@ -338,6 +478,7 @@ function SG:SendHello()
     Comm:Send({
         t = "HELLO", v = self.version, id = self.db.accountId, d = digest,
         sv = gdb.settings.ver or 0, ev = self.Events and self.Events:LatestModified() or 0,
+        fresh = wantsRestore() or nil,
     }, "GUILD")
     self:BroadcastProfile("GUILD")
 end
@@ -359,10 +500,22 @@ end
 -- Ciclo de vida
 ---------------------------------------------------------------------------
 function P:OnLogin()
+    if SG.restoring then
+        -- si nadie tiene la cuenta de este personaje, es un jugador nuevo de verdad
+        C_Timer.After(RESTORE_WINDOW, function()
+            if not SG.restoring then return end
+            SG.restoring = false
+            SG.db.my.restorePending = SG:Now()
+            SG:Fire("RESTORE_DONE")
+            SG:MarkDirty()
+            SG:BroadcastProfile()
+        end)
+    end
     SG:RequestRoster()
     if SetGuildRosterShowOffline then SetGuildRosterShowOffline(true) end
     C_Timer.After(8, function()
         SG:RefreshMyChar()
+        SG:TryRestoreStored()
         if IsInGuild() then SG:SendHello() end
     end)
     C_Timer.NewTicker(60, function()

@@ -11,7 +11,7 @@ SG.Settings = S
 S.defaults = {
     ver = 0, by = "",
     features = {
-        pvp = true, gold = true, dungeons = true, playtime = true,
+        pvp = true, gold = true, dungeons = true, playtime = true, cositas = true,
         dungeonHelper = true, whisperIcon = true, inviteIcon = true,
         zoneNotify = true, events = true, campSOS = true,
     },

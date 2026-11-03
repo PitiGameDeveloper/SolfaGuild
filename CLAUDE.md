@@ -24,6 +24,15 @@
 - Los textos editables están en `Data/Texts.lua`; los ajustes del GM (con sus valores por defecto) en
   `Modules/Settings.lua` y su pantalla en `UI/MainFrame.lua` (pestaña GM).
 - Cada módulo nuevo se añade al `SolfaGuild.toc`.
+- **Rendimiento mínimo, sobre todo en banda.** Antes que el registro de combate, usar eventos raros o
+  `hooksecurefunc`. Si hace falta el registro de combate, lo primero es comparar el GUID (lo que no es tuyo se
+  descarta sin más trabajo). Si una estadística no se puede contar barato, no se hace. Los contadores que
+  cambian a menudo no llaman a `SG:MarkDirty()`: viajan con el latido de 5 min del perfil.
+- Datos nuevos de personaje: si se guardan en `SG:MyChar()` y viajan en el perfil, añadirlos también a
+  `restoreFrom` de `Modules/Players.lua` (recupera la cuenta desde la guild si se borra el `WTF`). Mientras
+  `SG.restoring` es cierto no se envía el perfil ni salen hitos.
+- Para leer mensajes del sistema, construir el patrón a partir de la cadena del juego (`ERR_...`,
+  `LOOT_...` de GlobalStrings), nunca escribir el texto a mano: así vale en cualquier idioma.
 
 ## Distribución (WowUp desde GitHub)
 - La guild instala el addon con **WowUp → Instalar desde URL** → `https://github.com/PitiGameDeveloper/SolfaGuild`.
