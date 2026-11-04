@@ -247,10 +247,10 @@ local function buildSearch()
             updateForm(f)
         end)
     end
-    -- DPS: clic derecho suma, clic izquierdo resta
+    -- DPS: clic derecho resta, clic izquierdo suma
     f.D:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     f.D:SetScript("OnClick", function(_, button)
-        local n = f.need.D + (button == "RightButton" and 1 or -1)
+        local n = f.need.D + (button == "LeftButton" and 1 or -1)
         f.need.D = math.max(0, math.min(MAX_DPS, n))
         f.why:SetText("")
         updateForm(f)
