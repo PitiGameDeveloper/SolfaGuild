@@ -259,6 +259,8 @@ IsFlying = function() return false end
 RequestTimePlayed = function() end
 GetCursorPosition = function() return 0, 0 end
 GetSpellInfo = function(id) return "Hechizo" .. tostring(id) end
+RandomRoll = function() end
+InspectUnit = function() end
 -- como en Forever: una envoltura antigua que llama a la función nueva
 DoEmote = function(token, target) return C_ChatInfo.PerformEmote(token, target) end
 hooksecurefunc = function(a, b, c)

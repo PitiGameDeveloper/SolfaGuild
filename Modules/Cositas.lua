@@ -43,6 +43,41 @@ local function add(key, n)
     stats[key] = (stats[key] or 0) + (n or 1)
 end
 
+-- Lo que se puede hacer con una macro sin coste. wait: segundos entre uno que cuente y el
+-- siguiente; same: segundos para volver a contar a la misma persona. Se guarda por cuenta
+-- y sin viajar en el perfil, para que ni un /reload ni un alter lo reinicien.
+local LIMITS = {
+    hugs = { wait = 30, same = 3600 },
+    inspect = { wait = 30, same = 3600 },
+    rolls = { wait = 60 },
+    mail = { wait = 30 },
+}
+
+local function addLimited(key, who)
+    if not stats or not enabled then return end
+    local all = SG.db.my.cositasLimits or {}
+    SG.db.my.cositasLimits = all
+    local seen = all[key] or { who = {} }
+    all[key] = seen
+    local rule, now = LIMITS[key], SG:Now()
+    if seen.last and now - seen.last < rule.wait then return end
+    if who and seen.who[who] and now - seen.who[who] < rule.same then return end
+    seen.last = now
+    if who then seen.who[who] = now end
+    add(key)
+end
+
+-- Lo ya caducado no hace falta guardarlo
+local function forgetLimits()
+    local now = SG:Now()
+    for key, seen in pairs(SG.db.my.cositasLimits or {}) do
+        local same = LIMITS[key] and LIMITS[key].same or 0
+        for who, t in pairs(seen.who or {}) do
+            if now - t >= same then seen.who[who] = nil end
+        end
+    end
+end
+
 local function spellName(id)
     if C_Spell and C_Spell.GetSpellName then return C_Spell.GetSpellName(id) end
     return GetSpellInfo and (GetSpellInfo(id)) or nil
@@ -156,7 +191,7 @@ SG:On("LOOT_OPENED", function()
     end
 end)
 
-SG:On("MAIL_SEND_SUCCESS", function() add("mail") end)
+SG:On("MAIL_SEND_SUCCESS", function() addLimited("mail") end)
 
 SG:On("CHAT_MSG_LOOT", function(msg)
     if not msg then return end
@@ -357,6 +392,23 @@ local function hook(name, fn)
     if type(_G[name]) == "function" then hooksecurefunc(name, fn) end
 end
 
+-- Nombre de esa unidad si es otro jugador
+local function playerAt(unit)
+    if not unit or not UnitExists(unit) or not SG:Open(UnitIsPlayer(unit)) then return nil end
+    if SG:Open(UnitIsUnit(unit, "player")) then return nil end
+    return SG:UnitFull(unit)
+end
+
+-- A quién va un emote: el nombre escrito ("/hug Fulano") si se le puede ver, o si no el objetivo
+local function emoteTarget(arg)
+    arg = SG:Open(arg)
+    arg = type(arg) == "string" and strtrim(arg) or ""
+    if arg == "" then return playerAt("target") end
+    local name = SG:Short(arg)
+    if playerAt("target") == name then return name end
+    return playerAt(SG:GroupUnit(name))
+end
+
 local function refreshEnabled() enabled = SG:Feature("cositas") end
 SG:Listen("SETTINGS_CHANGED", refreshEnabled)
 
@@ -387,15 +439,19 @@ function Cos:OnLogin()
     hook("JumpOrAscendStart", function()
         if not IsSwimming() and not (IsFlying and IsFlying()) then add("jumps") end
     end)
-    hook("RandomRoll", function() add("rolls") end)
+    hook("RandomRoll", function() addLimited("rolls") end)
     hook("RollOnLoot", function(_, rollType) if rollType == LOOT_NEED then add("need") end end)
     hook("ConfirmTalentWipe", function() add("respec") end)
+    forgetLimits()
     hook("InspectUnit", function(unit)
-        if unit and UnitIsPlayer(unit) and not UnitIsUnit(unit, "player") then add("inspect") end
+        local who = playerAt(unit)
+        if who then addLimited("inspect", who) end
     end)
     -- el chat usa C_ChatInfo.PerformEmote y DoEmote solo la llama a ella: engancharse a las dos contaría doble
-    local function onEmote(token)
-        if type(token) == "string" and CUDDLY[token:upper()] then add("hugs") end
+    local function onEmote(token, arg)
+        if type(token) ~= "string" or not CUDDLY[token:upper()] then return end
+        local who = emoteTarget(arg)
+        if who then addLimited("hugs", who) end
     end
     if C_ChatInfo and C_ChatInfo.PerformEmote then
         hooksecurefunc(C_ChatInfo, "PerformEmote", onEmote)

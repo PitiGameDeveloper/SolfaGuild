@@ -82,7 +82,8 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] **Broker** y **Manos callosas**: siguen existiendo `ERR_AUCTION_WON_S`, `LOOT_ITEM_CREATED_SELF` y `LOOT_ITEM_CREATED_SELF_MULTIPLE`.
 - [ ] **Fumeta**: recoger hierbas suma (hechizo 2366, se compara por nombre).
 - [ ] **Camper**: suma en territorio enemigo (`C_PvP.GetZonePVPInfo` o `GetZonePVPInfo`).
-- [ ] **Bunny Hopper**, **Ludópata**, **Ninja**, **Stalker** y **Sobón**: suman (`JumpOrAscendStart`, `RandomRoll`, `RollOnLoot`, `InspectUnit`, `C_ChatInfo.PerformEmote`). `/hug`, `/kiss` y demás arrumacos suman solo una vez cada uno. Si una de esas funciones no existe, la categoría se queda a 0 sin dar error.
+- [ ] **Bunny Hopper**, **Ludópata**, **Ninja**, **Stalker** y **Sobón**: suman (`JumpOrAscendStart`, `RandomRoll`, `RollOnLoot`, `InspectUnit`, `C_ChatInfo.PerformEmote`). Si una de esas funciones no existe, la categoría se queda a 0 sin dar error.
+- [ ] **Topes contra macros**: `/hug` con otro jugador de objetivo suma; sin objetivo, a un PNJ o a ti, no. Repetirlo no suma hasta pasados 30 s y a la misma persona, hasta pasada 1 hora; un `/reload` no lo reinicia. `/hug Fulano` solo suma si lo tienes de objetivo o va en tu grupo. Comprobar que al clicar en un jugador para inspeccionarlo cuenta (Stalker), que `/roll` suma uno por minuto y el correo uno cada 30 s.
 - [ ] Nota musical en los susurros de compañeros y aviso de invitación (`ChatFrameUtil.AddMessageEventFilter`, `StaticPopup_Resize`).
 
 ## 8. Otros
