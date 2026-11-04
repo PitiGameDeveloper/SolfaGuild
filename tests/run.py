@@ -513,7 +513,13 @@ def t_ui():
     check('primera disponible es la más alta a nivel 30 (mínimo 29)', cards[firstopen][0] in ('Gnomeregan','Horado Rajacieno'), cards[firstopen][0])
     vs = a.ret('__panel.scroll:GetVerticalScroll()')
     check('scroll = fila de la primera', abs(vs + a.ret('__panel.cards[%d]._point[3]' % (firstopen + 1))) < 1, (vs, a.ret('__panel.cards[%d]._point[3]' % (firstopen + 1))))
-    check('primera en columna izquierda', a.ret('__panel.cards[%d]._point[2]' % (firstopen + 1)) == 0, a.ret('__panel.cards[%d]._point[2]' % (firstopen + 1)))
+    slots = {(a.ret('__panel.cards[%d]._point[2]' % i), a.ret('__panel.cards[%d]._point[3]' % i)) for i in range(1, n + 1)}
+    check('la primera mazmorra, en fila 1 y columna 1', (a.ret('__panel.cards[1]._point[2]'), a.ret('__panel.cards[1]._point[3]')) == (0, 0))
+    check('la rejilla no deja huecos', len(slots) == n and len({y for _, y in slots}) == (n + 1) // 2, sorted(slots))
+    art = {c[0]: a.ret('__panel.cards[%d].art:IsShown()' % (i + 1)) for i, c in enumerate(cards)}
+    check('imagen en la que tiene pantalla de carga', art['Sima Ígnea'] is True and art['Scholomance'] is True)
+    check('sin imagen, se queda el color', art['Prisión de Alcaz'] is False)
+    check('toda mazmorra con imagen menos las seis nuevas', a.ret('(function() local c = 0; for _, d in ipairs(SG.Dungeons) do if d.art then c = c + 1 end end; return c end)()') == 29)
     check('las de más nivel, bloqueadas', not any(c[1] for c in cards[:firstopen]))
     check('las siguientes, abiertas', all(c[1] for c in cards[firstopen:]))
     tick = {c[0]: c[2] for c in cards}
@@ -548,6 +554,20 @@ def t_ui():
     r = a.ret('SG.DungeonTracker:LadderRankOf(SG:MyAccount())')
     check('Ana tiene rango PvE', r == 'Leyenda de las Profundidades' or r is not None, r)
     no_errors(w, 'interfaz')
+    print(' LFS con un personaje que aún no llega a ninguna mazmorra')
+    w = World(True)
+    c = w.add('c', {'Cati Tres': {'class': 'PRIEST', 'level': 5}}, 'Cati Tres')
+    w.start()
+    c.rt.execute('''
+        local o = SG.UILFS.BuildPanel
+        SG.UILFS.BuildPanel = function(s, p) __panel = o(s, p); __pve = p; return __panel end
+    ''')
+    c.ev('SG.UI:Show("dungeons")')
+    c.ev('__pve.modeButtons[3]:Click()')
+    w.run(0.2)
+    check('nivel 5: se abre desde el principio', c.ret('__panel.scroll:GetVerticalScroll()') == 0, c.ret('__panel.scroll:GetVerticalScroll()'))
+    check('nivel 5: la primera, en fila 1 y columna 1', (c.ret('__panel.cards[1]._point[2]'), c.ret('__panel.cards[1]._point[3]')) == (0, 0))
+    no_errors(w, 'LFS a nivel bajo')
 
 def t_dungeons():
     print('\n== Mazmorra completada en Forever ==')

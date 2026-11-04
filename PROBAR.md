@@ -42,8 +42,9 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 
 ## 5. LFS
 - [ ] `/sg lfs` enseña la oferta de prueba: el texto cabe y se ven los botones de radio (si `UIRadioButtonTemplate` no existe, salen casillas).
-- [ ] **Imágenes de las tarjetas**: salen del Diario de encuentros (`EJ_GetInstanceByIndex`), y si no, de un color. Ajustar el recorte en `fillCard` (`UI/LFS.lua`) o poner imágenes propias: `Media\Dungeons\<id>.tga` y `art = true` en `Data/Dungeons.lua`.
-- [ ] La lista se abre con la mazmorra más alta a la que puedes ir arriba del todo; subiendo se ven las bloqueadas.
+- [ ] **Imágenes de las tarjetas**: son las pantallas de carga del juego (`LOADING_SCREEN` en `Data/Dungeons.lua`). Comprobar que salen, que no se ven estiradas (recorte en `fillCard`, `UI/LFS.lua`) y que cada una es la de su mazmorra. Dalaran, La Ciudad Sumergida, Krol'dok, Alcaz, Faucenegra y La Terraza del Creador salen de color: falta su identificador.
+- [ ] La rejilla no deja huecos: la primera mazmorra va en la fila 1, columna 1.
+- [ ] La lista se abre con la fila de la mazmorra más alta a la que puedes ir arriba del todo; subiendo se ven las bloqueadas. Por debajo del nivel de la primera mazmorra se abre desde el principio.
 - [ ] El tick verde sale en las mazmorras completadas.
 - [ ] La búsqueda llega a quien toca, en el orden correcto, y nunca a quien no llega al nivel.
 - [ ] Quien acepta sale de su grupo y entra **sin pulsar nada más**.

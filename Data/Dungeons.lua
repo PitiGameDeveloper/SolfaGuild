@@ -3,8 +3,7 @@
 -- min/max: rango de nivel. Por debajo de min no se puede pedir ni recibir el LFS.
 -- bosses: NPC IDs del jefe final (al morir dentro de la instancia cuenta como
 -- completada). Vacío = aún no se sabe, así que esa mazmorra no se marca nunca.
--- color: fondo de la tarjeta si el juego no da imagen. art = true: hay imagen
--- propia en Media\Dungeons\<id>.tga.
+-- color: fondo de la tarjeta si no hay imagen (ver LOADING_SCREEN, más abajo).
 -- >>> Niveles, nombres y jefes por confirmar: ver PROBAR.md <<<
 
 local _, ns = ...
@@ -48,9 +47,22 @@ SG.Dungeons = {
     { id = "scholo", name = "Scholomance", en = "Scholomance", min = 58, max = 60, bosses = { 1853 }, color = { 0.24, 0.18, 0.30 } },
 }
 
+-- Imagen de cada tarjeta: pantalla de carga del juego, por su identificador de archivo
+-- (los mismos que usa Attune en Forever). Las mazmorras nuevas de Forever que no están
+-- aquí no tienen identificador conocido y se quedan con su color.
+local LOADING_SCREEN = {
+    rfc = 131862, thanes = 131834, ruins = 131867, wc = 131882, vc = 131833, sfk = 131869,
+    bfd = 131823, stocks = 131870, excav = 7963777, gnomer = 131841, rfk = 131865,
+    smgy = 131852, smlib = 131852, smarm = 131852, smcath = 131852, rfd = 131864,
+    ulda = 131876, zf = 131885, mara = 131850, st = 131872, brd = 131824,
+    lbrs = 131824, ubrs = 131824, -- Cumbre de Roca Negra: misma montaña que Profundidades
+    dme = 131835, dmw = 131835, dmn = 131835, stratl = 131871, stratu = 131871, scholo = 131868,
+}
+
 SG.DungeonById = {}
 SG.DungeonByBoss = {}
 for _, d in ipairs(SG.Dungeons) do
+    d.art = LOADING_SCREEN[d.id]
     SG.DungeonById[d.id] = d
     for _, npc in ipairs(d.bosses) do SG.DungeonByBoss[npc] = d end
 end

@@ -27,48 +27,6 @@ end
 local function roleName(role) return SG.Texts.ui["lfsRole" .. role] or role end
 
 ---------------------------------------------------------------------------
--- Imágenes: la del propio juego (Diario de encuentros) si el cliente la tiene,
--- o una propia en Media\Dungeons. Si no hay, se queda el color de la mazmorra.
----------------------------------------------------------------------------
-local journalArt     -- [nombre en minúsculas] = textura
-
-local function loadJournalArt()
-    if journalArt then return journalArt end
-    journalArt = {}
-    if not (EJ_GetNumTiers and EJ_SelectTier and EJ_GetInstanceByIndex) then return journalArt end
-    pcall(function()
-        local tier = EJ_GetCurrentTier and EJ_GetCurrentTier()
-        for t = 1, EJ_GetNumTiers() do
-            EJ_SelectTier(t)
-            local i = 1
-            while true do
-                local id, name, _, _, button = EJ_GetInstanceByIndex(i, false)
-                if not id then break end
-                if name and button then journalArt[name:lower()] = button end
-                i = i + 1
-            end
-        end
-        if tier then EJ_SelectTier(tier) end
-    end)
-    return journalArt
-end
-
-local function artFor(d)
-    if d.art then return "Interface\\AddOns\\SolfaGuild\\Media\\Dungeons\\" .. d.id, true end
-    local art = loadJournalArt()
-    local names = { d.name:lower(), d.en:lower() }
-    for _, want in ipairs(names) do
-        if art[want] then return art[want] end
-    end
-    -- "Monasterio Escarlata: Biblioteca" -> "Monasterio Escarlata"
-    for _, want in ipairs(names) do
-        for name, tex in pairs(art) do
-            if want:find(name, 1, true) or name:find(want, 1, true) then return tex end
-        end
-    end
-end
-
----------------------------------------------------------------------------
 -- Tarjeta de mazmorra
 ---------------------------------------------------------------------------
 local function buildCard(parent)
@@ -110,12 +68,10 @@ local function fillCard(b, d, myLevel, accounts)
     local locked = myLevel < d.min
     local c = d.color or { 0.25, 0.25, 0.25 }
     b.base:SetColorTexture(c[1], c[2], c[3], 1)
-    local tex, own = artFor(d)
-    if tex then
-        b.art:SetTexture(tex)
-        -- recorte de la imagen a lo ancho de la tarjeta
-        if own then b.art:SetTexCoord(0, 1, 0, 1)
-        else b.art:SetTexCoord(0, 0.684, 0.14, 0.60) end
+    -- si el cliente no tiene la imagen, se queda el color de la mazmorra
+    if d.art and b.art:SetTexture(d.art) ~= false then
+        -- la franja central de la pantalla de carga (4:3) en una tarjeta de 4:1
+        b.art:SetTexCoord(0, 1, 0.33, 0.67)
         b.art:Show()
     else
         b.art:Hide()
@@ -136,8 +92,9 @@ local function fillCard(b, d, myLevel, accounts)
     b:SetScript("OnClick", function() UILFS:OpenSearch(d) end)
 end
 
--- Panel de la pestaña: de mayor a menor nivel, colocado para que la primera
--- arriba del todo sea la más alta a la que puedes ir; subiendo se ven las demás.
+-- Panel de la pestaña: de mayor a menor nivel, colocado para que la fila de arriba
+-- tenga la más alta a la que puedes ir; subiendo se ven las demás. Si aún no
+-- llegas a ninguna, se abre desde el principio.
 function UILFS:BuildPanel(parent)
     local p = CreateFrame("Frame", nil, parent)
     p:SetAllPoints()
@@ -170,27 +127,25 @@ function UILFS:BuildPanel(parent)
         local cardW = (width - CARD_GAP) / 2
         self.content:SetWidth(width)
 
-        local first = #sorted + 1
+        local first = 1
         for i, d in ipairs(sorted) do
             if d.min <= level then first = i; break end
         end
-        -- las disponibles empiezan fila: si hace falta queda un hueco entre las bloqueadas
-        local shift = (first - 1) % 2
         for i, d in ipairs(sorted) do
             local b = self.cards[i]
             if not b then
                 b = buildCard(self.content)
                 self.cards[i] = b
             end
-            local slot = i - 1 + shift
+            local slot = i - 1
             b:ClearAllPoints()
             b:SetWidth(cardW)
             b:SetPoint("TOPLEFT", (slot % 2) * (cardW + CARD_GAP), -math.floor(slot / 2) * (CARD_H + CARD_GAP))
             fillCard(b, d, level, accounts)
         end
         local rowH = CARD_H + CARD_GAP
-        local total = math.ceil((#sorted + shift) / 2) * rowH
-        local firstY = math.floor((first - 1 + shift) / 2) * rowH
+        local total = math.ceil(#sorted / 2) * rowH
+        local firstY = math.floor((first - 1) / 2) * rowH
         -- sitio de sobra para poder dejar la primera arriba aunque haya pocas debajo
         self.content:SetHeight(math.max(total, firstY + self.scroll:GetHeight()))
         if self.needScroll then
