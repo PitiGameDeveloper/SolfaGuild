@@ -10,9 +10,9 @@ local _, ns = ...
 local SG = ns.SG
 
 SG.Dungeons = {
-    { id = "rfc",    name = "Sima Ígnea", en = "Ragefire Chasm", min = 13, max = 18, bosses = { 11519, 11520 }, color = { 0.55, 0.16, 0.05 } },
-    { id = "thanes", name = "Salón de los Thanes", en = "Hall of Thanes", min = 13, max = 20, bosses = { 261319 }, color = { 0.45, 0.32, 0.16 } },
-    { id = "ruins",  name = "Ruinas de Lordaeron", en = "Ruins of Lordaeron", min = 15, max = 22, bosses = { 250657 }, color = { 0.22, 0.32, 0.26 } },
+    { id = "rfc",    name = "Sima Ígnea", en = "Ragefire Chasm", min = 1, max = 18, bosses = { 11519, 11520 }, color = { 0.55, 0.16, 0.05 } },
+    { id = "thanes", name = "Salón de los Thanes", en = "Hall of Thanes", min = 1, max = 20, bosses = { 261319 }, color = { 0.45, 0.32, 0.16 } },
+    { id = "ruins",  name = "Ruinas de Lordaeron", en = "Ruins of Lordaeron", min = 1, max = 22, bosses = { 250657 }, color = { 0.22, 0.32, 0.26 } },
     { id = "wc",     name = "Cuevas de los Lamentos", en = "Wailing Caverns", min = 15, max = 24, bosses = { 3654 }, color = { 0.10, 0.36, 0.22 } },
     { id = "vc",     name = "Las Minas de la Muerte", en = "Deadmines", min = 17, max = 26, bosses = { 639 }, color = { 0.13, 0.36, 0.42 } },
     { id = "sfk",    name = "Castillo de Colmillo Oscuro", en = "Shadowfang Keep", min = 20, max = 30, bosses = { 4275 }, color = { 0.18, 0.24, 0.20 } },
