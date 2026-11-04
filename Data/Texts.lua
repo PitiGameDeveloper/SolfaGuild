@@ -106,11 +106,11 @@ T.dungeonRanks = {
 ---------------------------------------------------------------------------
 T.cositas = {
     { key = "fish",      title = "Chill guy",          desc = "Peces pescados." },
-    { key = "boars",     title = "P.E.T.A.",           desc = "Jabalíes matados (golpe final tuyo o de tu mascota)." },
+    { key = "boars",     title = "P.E.T.A.",           desc = "Bichos con \"jaba\" en el nombre que te han dado experiencia al morir." },
     { key = "swim",      title = "Como pez en el agua", desc = "Tiempo nadando (sin estar ausente).", time = true },
     { key = "played",    title = "Sudoroso",           desc = "Tiempo jugado (/played de todos los personajes).", time = true },
     { key = "enemyLand", title = "Sediento de sangre", desc = "Tiempo en territorio de la %enemy% (sin contar zonas en disputa ni estando ausente).", time = true },
-    { key = "buffs",     title = "Colegón",            desc = "Bufos lanzados a otros jugadores." },
+    { key = "buffs",     title = "Colegón",            desc = "Bufos lanzados a otros jugadores (repetir el mismo al mismo jugador no cuenta)." },
     { key = "respec",    title = "Meta chaser",        desc = "Veces que se ha reiniciado los talentos." },
     -- oculta hasta probar en Forever si hay peluquería (se sigue contando si existe el evento)
     -- { key = "barber",    title = "Estiloso",          desc = "Cambios de peinado en la peluquería." },
@@ -126,8 +126,8 @@ T.cositas = {
     { key = "inspect",   title = "Stalker",            desc = "Veces que ha inspeccionado a otros jugadores." },
     { key = "rolls",     title = "Ludópata",           desc = "/roll tirados." },
     { key = "need",      title = "Ninja",              desc = "Veces que ha elegido Necesidad al repartir botín." },
-    { key = "rez",       title = "Ángel de la guarda", desc = "Resurrecciones lanzadas a otros jugadores." },
-    { key = "heal",      title = "Ambulancia",         desc = "Curación hecha a otros jugadores (sin contar la que sobra)." },
+    { key = "rez",       title = "Ángel de la guarda", desc = "Resurrecciones lanzadas a otros jugadores (repetir a quien aún no se ha levantado no cuenta)." },
+    { key = "heal",      title = "Ambulancia",         desc = "Curación hecha, según el medidor de daño del propio juego." },
     { key = "mail",      title = "Cartero",            desc = "Correos enviados." },
     { key = "herbs",     title = "Fumeta",             desc = "Hierbas recogidas." },
     { key = "jumps",     title = "Bunny Hopper",       desc = "Saltos." },

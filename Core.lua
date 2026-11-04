@@ -153,15 +153,35 @@ function SG:Target(name)
     return self.rawNames[name] or (r and r.full) or name
 end
 
--- ¿Va en mi grupo? Por nombre UnitInParty no siempre vale con apellidos: se mira uno a uno.
-function SG:InMyGroup(name)
-    if not IsInGroup() then return false end
+-- Unidad de un compañero de grupo. Por nombre UnitInParty no siempre vale con
+-- apellidos: se mira uno a uno. El juego a veces da solo el nombre, sin apellido.
+function SG:GroupUnit(name)
+    if not IsInGroup() then return nil end
     local raid = IsInRaid()
     for i = 1, GetNumGroupMembers() do
         local unit = raid and ("raid" .. i) or ("party" .. i)
-        if UnitExists(unit) and self:UnitFull(unit) == name then return true end
+        if UnitExists(unit) then
+            if self:UnitFull(unit) == name or self:Open((UnitName(unit))) == name then return unit end
+        end
     end
-    return false
+end
+
+function SG:InMyGroup(name)
+    return self:GroupUnit(name) ~= nil
+end
+
+-- Resumen de muerte del juego: la entrada más reciente es el golpe final
+function SG:LastRecap()
+    local DR = C_DeathRecap
+    if not (DR and DR.HasRecapEvents and self:Open(DR.HasRecapEvents())) then return nil end
+    local list = DR.GetRecapEvents()
+    if type(list) ~= "table" then return nil end
+    local best, bestT
+    for _, ev in ipairs(list) do
+        local t = self:Open(ev.timestamp) or 0
+        if not best or t >= bestT then best, bestT = ev, t end
+    end
+    return best
 end
 
 function SG:GuildName()

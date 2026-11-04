@@ -162,15 +162,7 @@ end)
 -- Forever: lo dice el resumen de muerte del juego. La entrada más reciente es el
 -- golpe final. Devuelve el nombre si fue un jugador; si no, nil.
 local function killerFromRecap()
-    local DR = C_DeathRecap
-    if not (DR and DR.HasRecapEvents and SG:Open(DR.HasRecapEvents())) then return end
-    local list = DR.GetRecapEvents()
-    if type(list) ~= "table" then return end
-    local best, bestT
-    for _, ev in ipairs(list) do
-        local t = SG:Open(ev.timestamp) or 0
-        if not best or t >= bestT then best, bestT = ev, t end
-    end
+    local best = SG:LastRecap()
     if not best then return end
     local guid = SG:Open(best.sourceGUID)
     if type(guid) ~= "string" or not guid:find("^Player%-") or guid == SG:Open(UnitGUID("player")) then return end

@@ -27,7 +27,8 @@
 - **En Forever el registro de combate está prohibido** (`COMBAT_LOG_EVENT_UNFILTERED` da un aviso de "bloqueado"
   al jugador) y hay valores ocultos (`issecretvalue`, usar `SG:Open`): solo se registra si `SG.HasCombatLog`. Hay
   otras vías: `UNIT_DIED`, `PARTY_KILL`, muertes honorables y `C_DeathRecap` (ver `Modules/PvP.lua` y
-  `Modules/CampSOS.lua`). Lo que aún depende del registro (parte de Cositas) no cuenta en Forever.
+  `Modules/CampSOS.lua`), hechizos propios (`UNIT_SPELLCAST_*`) y `C_DamageMeter` para curación y daño, como Details
+  (`Modules/Cositas.lua`; sus valores están ocultos en combate, se leen al salir).
 - **PvP en Forever: decisión del GM.** Solo cuentan las muertes honorables. Un asesinato coordinado es que varios
   Solfamidas avisen de una muerte honorable con el mismo identificador del muerto (`UNIT_DIED`/`PARTY_KILL`); si falta,
   misma zona a la vez y mismo grupo u objetivo. Eso nunca suma asesinatos. Un enemigo que no da honor no debe contar

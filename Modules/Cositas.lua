@@ -7,6 +7,11 @@
 -- marco y lo primero que hace es comparar el GUID de origen/destino con el
 -- tuyo, así que lo que no sea tuyo se descarta sin más trabajo.
 -- Los contadores no fuerzan envíos: viajan con el latido de 5 min del perfil.
+--
+-- En Forever no hay registro de combate (ver la sección "Forever"):
+-- Paracaidista, por el resumen de muerte. Colegón y Ángel de la guarda, por los
+-- hechizos que lanzas. P.E.T.A., por la línea de experiencia. Ambulancia, por el
+-- medidor de daño del propio juego (C_DamageMeter, lo mismo que usa Details).
 
 local _, ns = ...
 local SG = ns.SG
@@ -25,7 +30,7 @@ local SESSION_GAP = 180        -- si pasa menos que esto entre muestras (un /rel
 -- emotes que cuentan para "Sobón"
 local CUDDLY = { HUG = true, KISS = true, PET = true, CUDDLE = true, TICKLE = true, LOVE = true, FLIRT = true }
 -- nombres de jabalí (cliente en español o en inglés)
-local BOAR_NAMES = { "jabal", "boar" }
+local BOAR_NAMES = { "jaba", "boar" }
 local HERB_SPELL = 2366        -- Recoger hierbas (todos los rangos se llaman igual)
 
 local stats       -- SG:MyChar().cositas (nil hasta entrar al juego)
@@ -117,10 +122,28 @@ local function inGroup()
     return (GetNumGroupMembers and GetNumGroupMembers() or 0) > 0
 end
 
+-- Solo la caída: ahogarse, la fatiga o la lava no cuentan
+local function fellToDeath()
+    local best = SG:LastRecap()
+    local env = best and SG:Open(best.environmentalType)
+    return env ~= nil and tostring(env):lower() == "falling"
+end
+
+local lastDeath = -math.huge
 SG:On("PLAYER_DEAD", function()
+    -- en Forever el juego repite el evento al liberar el espíritu
+    local now = GetTime()
+    if now - lastDeath < 30 then return end
+    lastDeath = now
     add("deaths")
-    if GetTime() - lastFall < 2 then add("falls") end
     if inGroup() and not groupMateDead() then add("leeroy") end
+    if SG.HasCombatLog then
+        if now - lastFall < 2 then add("falls") end
+    else
+        C_Timer.After(1, function()
+            if fellToDeath() then add("falls") end
+        end)
+    end
 end)
 
 ---------------------------------------------------------------------------
@@ -147,11 +170,156 @@ SG:On("CHAT_MSG_SYSTEM", function(msg)
     if AUCTION_WON and msg and msg:match(AUCTION_WON) then add("ah") end
 end)
 
+---------------------------------------------------------------------------
+-- Forever: Colegón y Ángel de la guarda, por los hechizos que lanzas a otros
+---------------------------------------------------------------------------
+-- Primer rango de cada hechizo: los demás rangos se llaman igual y se compara por nombre
+local BUFF_SPELLS = {
+    1243, 14752, 976, 17, 6346, 10060, 1706,                -- sacerdote
+    21562, 27681, 27683,                                    -- sacerdote, de grupo
+    1459, 1008, 604, 23028,                                 -- mago
+    1126, 467, 29166, 21849,                                -- druida
+    19740, 19742, 20217, 1038, 19977, 20911, 1044, 1022, 6940,   -- paladín
+    25782, 25894, 25898, 25895, 25890, 25899,               -- paladín, superiores
+    5697, 132, 11743,                                       -- brujo
+    131, 546,                                               -- chamán
+}
+local REZ_SPELLS = { 2006, 7328, 2008, 20484 }
+local BUFF_REPEAT = 300     -- s sin volver a contar el mismo bufo al mismo jugador
+local REZ_FORGET = 600      -- s sin volver a contar a quien sigue muerto y no se puede ver
+
+local spellKind             -- [nombre del hechizo] = "buff" o "rez"
+local casts = {}            -- [identificador del lanzamiento] = { kind, spell, target, t }
+local buffed, rezzed = {}, {}   -- [hechizo|jugador] y [jugador] = GetTime()
+
+local function buildSpellKinds()
+    spellKind = {}
+    for _, id in ipairs(BUFF_SPELLS) do
+        local n = spellName(id)
+        if n then spellKind[n] = "buff" end
+    end
+    for _, id in ipairs(REZ_SPELLS) do
+        local n = spellName(id)
+        if n then spellKind[n] = "rez" end
+    end
+end
+
+local function onCastSent(target, castGUID, spellID)
+    target, spellID = SG:Open(target), SG:Open(spellID)
+    if not spellKind or not spellID or not castGUID or type(target) ~= "string" or target == "" then return end
+    local spell = spellName(spellID)
+    local kind = spell and spellKind[spell]
+    if not kind then return end
+    target = SG:Short(target)
+    if target == SG:MyName() or target == (UnitName("player")) then return end
+    -- a mascotas y criaturas no; solo se puede saber si lo tienes de objetivo
+    if SG:UnitFull("target") == target and not SG:Open(UnitIsPlayer("target")) then return end
+    casts[castGUID] = { kind = kind, spell = spell, target = target, t = GetTime() }
+end
+
+local function onCastDone(castGUID)
+    local c = castGUID and casts[castGUID]
+    if not c then return end
+    casts[castGUID] = nil
+    local now = GetTime()
+    if c.kind == "buff" then
+        local k = c.spell .. "|" .. c.target
+        -- repetirlo renueva la espera: quien lo spamea no suma nunca
+        if not buffed[k] or now - buffed[k] >= BUFF_REPEAT then add("buffs") end
+        buffed[k] = now
+    elseif not rezzed[c.target] then
+        add("rez")
+        rezzed[c.target] = now
+    end
+end
+
+-- Quien ya estaba resucitado y sigue muerto (aceptando o ausente) no vuelve a contar
+-- hasta que se le vea vivo. Si no va en tu grupo ni es tu objetivo, se olvida con el tiempo.
+local function forgetRezzed(now)
+    for name, t in pairs(rezzed) do
+        local unit = SG:GroupUnit(name) or (SG:UnitFull("target") == name and "target") or nil
+        if now - t > REZ_FORGET or (unit and SG:Open(UnitIsDeadOrGhost(unit)) == false) then
+            rezzed[name] = nil
+        end
+    end
+    for k, t in pairs(buffed) do
+        if now - t > BUFF_REPEAT then buffed[k] = nil end
+    end
+    for k, c in pairs(casts) do
+        if now - c.t > 60 then casts[k] = nil end
+    end
+end
+
+---------------------------------------------------------------------------
+-- Forever: P.E.T.A., por la línea de experiencia ("Jabalí muere, ganas 12...")
+---------------------------------------------------------------------------
+local function xpPattern(fmt)
+    if type(fmt) ~= "string" then return nil end
+    fmt = fmt:gsub("%%%d%$([sd])", "%%%1")
+    local middle = fmt:match("^%%s(.-)%%d")
+    if not middle then return nil end
+    return "^(.-)" .. middle:gsub("([%(%)%.%+%-%*%?%[%]%^%$%%])", "%%%1")
+end
+
+local XP_LINE = xpPattern(COMBATLOG_XPGAIN_FIRSTPERSON)
+
+if not SG.HasCombatLog then
+    SG:On("CHAT_MSG_COMBAT_XP_GAIN", function(msg)
+        msg = SG:Open(msg)
+        if not XP_LINE or type(msg) ~= "string" then return end
+        if isBoar(msg:match(XP_LINE)) then add("boars") end
+    end)
+end
+
+---------------------------------------------------------------------------
+-- Forever: Ambulancia, por el medidor del propio juego. Los valores están ocultos
+-- en combate, así que se lee al salir, y de cada sesión solo se suma lo nuevo.
+---------------------------------------------------------------------------
+local healSeen             -- [sesión] = curación ya sumada (nil hasta la primera lectura)
+
+local function readHealing(baseline)
+    local DM = C_DamageMeter
+    if not (DM and DM.GetAvailableCombatSessions and DM.GetCombatSessionFromID) or SG:InCombat() then return end
+    local healType = (Enum and Enum.DamageMeterType and Enum.DamageMeterType.HealingDone) or 2
+    for _, s in ipairs(DM.GetAvailableCombatSessions() or {}) do
+        local id = SG:Open(s.sessionID)
+        local session = id and DM.GetCombatSessionFromID(id, healType)
+        local sources = session and SG:Open(session.combatSources)
+        for _, src in ipairs(type(sources) == "table" and sources or {}) do
+            if SG:Open(src.isLocalPlayer) then
+                local total = SG:Open(src.totalAmount)
+                if type(total) == "number" then
+                    if not baseline and total > (healSeen[id] or 0) then add("heal", total - (healSeen[id] or 0)) end
+                    healSeen[id] = total
+                end
+                break
+            end
+        end
+    end
+end
+
+if not SG.HasCombatLog and C_DamageMeter then
+    SG:On("PLAYER_REGEN_ENABLED", function()
+        C_Timer.After(3, function() if healSeen then SG:Try(readHealing) end end)
+    end)
+    SG:On("DAMAGE_METER_COMBAT_SESSION_UPDATED", function()
+        if healSeen and not SG:InCombat() then SG:Try(readHealing) end
+    end)
+    SG:On("DAMAGE_METER_RESET", function()
+        if healSeen then wipe(healSeen) end
+    end)
+end
+
 local herbName
 local spells = CreateFrame("Frame")
-spells:SetScript("OnEvent", function(_, _, unit, _, spellID)
-    if unit ~= "player" or not herbName or not spellID then return end
-    if spellName(spellID) == herbName then add("herbs") end
+spells:SetScript("OnEvent", function(_, event, unit, a, b, c)
+    if unit ~= "player" then return end
+    if event == "UNIT_SPELLCAST_SENT" then
+        onCastSent(a, b, c)       -- objetivo, identificador del lanzamiento, hechizo
+        return
+    end
+    onCastDone(a)                 -- identificador del lanzamiento, hechizo
+    if herbName and b and spellName(b) == herbName then add("herbs") end
 end)
 
 -- La peluquería no existe en Classic Era: si el evento no existe, no se registra
@@ -174,6 +342,7 @@ local function tick()
     if len > (stats.session or 0) then stats.session = len end
 
     local afk = UnitIsAFK("player")
+    if not SG.HasCombatLog then forgetRezzed(GetTime()) end
     if not afk and IsSwimming() then add("swim", TICK) end
     local zoneInfo = (C_PvP and C_PvP.GetZonePVPInfo) or GetZonePVPInfo
     if not afk and zoneInfo and zoneInfo() == "hostile" then add("enemyLand", TICK) end
@@ -204,6 +373,15 @@ function Cos:OnLogin()
         spells:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
     else
         spells:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+    end
+    if not SG.HasCombatLog then
+        buildSpellKinds()
+        spells:RegisterEvent("UNIT_SPELLCAST_SENT")
+        -- lo que el medidor ya tenía al entrar (tras un /reload) no se vuelve a sumar
+        C_Timer.After(2, function()
+            healSeen = {}
+            SG:Try(readHealing, true)
+        end)
     end
 
     hook("JumpOrAscendStart", function()

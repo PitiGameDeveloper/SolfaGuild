@@ -1,6 +1,7 @@
 -- API de WoW simulada, una copia por cliente. CFG lo rellena sim.py.
 NOW = 10000
 FRAMES, TIMERS, ONUPDATE = {}, {}, {}
+DM_SESSIONS, DM_DATA = {}, {}
 UNITS, ROSTER, GROUP, RECAP, PLAYERS, SECRETS, FORBIDDEN, CL_EVENT = {}, {}, {}, nil, {}, {}, {}, nil
 LEADER, IS_RAID, INST, INST_KIND, COMBAT, ZONE, HK = true, false, false, "none", false, "Baldíos", 0
 
@@ -175,6 +176,13 @@ if true then
     function lua_initForever()
         if CFG.forever then
             issecretvalue = function(v) return SECRETS[v] == true end
+            C_Spell = { GetSpellName = function(id) return "Hechizo" .. tostring(id) end }
+            C_DamageMeter = {
+                GetAvailableCombatSessions = function() return DM_SESSIONS end,
+                GetCombatSessionFromID = function(id, kind) return DM_DATA[id] end,
+            }
+            Enum = { DamageMeterType = { HealingDone = 2 } }
+            COMBATLOG_XPGAIN_FIRSTPERSON = "%s muere, ganas %d puntos de experiencia."
             C_DeathRecap = {
                 HasRecapEvents = function() return RECAP ~= nil end,
                 GetRecapEvents = function() return RECAP end,

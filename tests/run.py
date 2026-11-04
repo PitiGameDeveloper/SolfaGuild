@@ -564,7 +564,129 @@ def t_dungeons():
     check('otro bicho no cuenta', a.ret('SG:MyChar().dungeonsWeek') == 1)
     no_errors(w, 'mazmorra')
 
-TESTS = [lambda: t_names(0), lambda: t_names(1), lambda: t_names(2), t_migration, t_pvp, t_classic, t_sos,
+# ------------------------------------------------------------------ Cositas
+def t_cositas():
+    print('\n== Cositas en Forever ==')
+    w, a, b, c = base(); w.start()
+    stat = lambda k: a.ret('SG:MyChar().cositas.%s or 0' % k)
+    n = {'g': 0}
+    def cast(spell, target, ok=True):
+        n['g'] += 1
+        guid = 'Cast-%d' % n['g']
+        a.fire('UNIT_SPELLCAST_SENT', 'player', target, guid, spell)
+        if ok:
+            a.fire('UNIT_SPELLCAST_SUCCEEDED', 'player', guid, spell)
+
+    print(' Paracaidista: solo las caídas')
+    for env, want in (('Drowning', 0), ('Fatigue', 0), ('Lava', 0), ('Falling', 1)):
+        a.rt.execute('RECAP = { { timestamp = 1, environmentalType = %r } }' % env)
+        a.fire('PLAYER_DEAD'); w.run(2)
+        check('%s: %d' % (env, want), stat('falls') == want, stat('falls'))
+        w.run(30)
+    a.rt.execute('RECAP = { { timestamp = 1, sourceGUID = "Creature-0-1-1-1-1-1", sourceName = "Lobo" } }')
+    a.fire('PLAYER_DEAD'); w.run(2)
+    check('un monstruo no cuenta', stat('falls') == 1)
+    check('muertes: 5', stat('deaths') == 5, stat('deaths'))
+    a.fire('PLAYER_DEAD'); w.run(2)
+    check('el evento repetido al liberar no suma otra muerte', stat('deaths') == 5, stat('deaths'))
+
+    print(' Ángel de la guarda: sin spam')
+    w.make_group(a, b)
+    a.g.UNITS['party1'].dead = True
+    cast(2006, 'Beto-Dos')
+    check('primera resurrección cuenta', stat('rez') == 1, stat('rez'))
+    cast(2006, 'Beto-Dos'); cast(2006, 'Beto-Dos')
+    check('spam a quien no acepta: no suma', stat('rez') == 1, stat('rez'))
+    w.run(30)
+    cast(2006, 'Beto-Dos')
+    check('aunque pase tiempo, si sigue muerto: no suma', stat('rez') == 1, stat('rez'))
+    cast(2006, 'Ciro-Tres')
+    check('a otro jugador: suma', stat('rez') == 2, stat('rez'))
+    cast(2006, 'Ciro-Tres', ok=False)
+    a.g.UNITS['party1'].dead = False
+    w.run(5)
+    cast(2006, 'Beto-Dos')
+    check('ya vivo y muerto otra vez: suma', stat('rez') == 3, stat('rez'))
+    w.run(601)
+    cast(2006, 'Ciro-Tres')
+    check('fuera de vista: se olvida a los 10 min', stat('rez') == 4, stat('rez'))
+    cast(2006, 'Dani-Ocho', ok=False)
+    check('lanzamiento interrumpido: no suma', stat('rez') == 4, stat('rez'))
+
+    print(' Colegón: por hechizo y jugador')
+    cast(5697, 'Beto-Dos')
+    check('respirar bajo el agua a Beto', stat('buffs') == 1, stat('buffs'))
+    cast(5697, 'Beto-Dos'); cast(5697, 'Beto-Dos')
+    check('spam al mismo: no suma', stat('buffs') == 1, stat('buffs'))
+    cast(5697, 'Ciro-Tres')
+    check('a otro jugador: suma', stat('buffs') == 2, stat('buffs'))
+    cast(1459, 'Beto-Dos')
+    check('otro bufo a Beto: suma', stat('buffs') == 3, stat('buffs'))
+    cast(5697, 'Ana-Uno'); cast(5697, '')
+    check('a mí mismo: no suma', stat('buffs') == 3, stat('buffs'))
+    cast(133, 'Beto-Dos')
+    check('hechizo que no es bufo: no suma', stat('buffs') == 3, stat('buffs'))
+    w.run(200); cast(5697, 'Beto-Dos')
+    w.run(200); cast(5697, 'Beto-Dos')
+    check('spam espaciado sin pasar 5 min: no suma', stat('buffs') == 3, stat('buffs'))
+    w.run(301); cast(5697, 'Beto-Dos')
+    check('pasados 5 min: suma', stat('buffs') == 4, stat('buffs'))
+    a.set_unit('target', 'Lobo', None, faction='Horde', guid='Pet-1', is_player=False)
+    cast(5697, 'Lobo')
+    check('a una mascota: no suma', stat('buffs') == 4, stat('buffs'))
+
+    print(' P.E.T.A.: cualquier bicho con "jaba"')
+    for line, want in (('Jabalí joven muere, ganas 12 puntos de experiencia.', 1),
+                       ('Jabato furioso muere, ganas 12 puntos de experiencia. (+3 de bonificación de grupo)', 2),
+                       ('Lobo muere, ganas 12 puntos de experiencia.', 2),
+                       ('Has descubierto algo y ganas 20 de experiencia.', 2)):
+        a.fire('CHAT_MSG_COMBAT_XP_GAIN', line)
+        check(line[:24], stat('boars') == want, stat('boars'))
+
+    print(' Ambulancia: medidor del juego')
+    w, a, b, c = base()
+    def session(i, mine, other=999, secret=False):
+        a.rt.execute("""
+            DM_DATA[%d] = { combatSources = {
+                { isLocalPlayer = false, totalAmount = %d },
+                { isLocalPlayer = true, totalAmount = %d } } }
+            local found = false
+            for _, s in ipairs(DM_SESSIONS) do if s.sessionID == %d then found = true end end
+            if not found then DM_SESSIONS[#DM_SESSIONS + 1] = { sessionID = %d } end
+        """ % (i, other, mine, i, i))
+    session(1, 100)
+    w.start()
+    check('lo de antes de entrar no suma', stat('heal') == 0, stat('heal'))
+    a.g.COMBAT = True
+    session(2, 500)
+    a.fire('PLAYER_REGEN_DISABLED')
+    a.fire('DAMAGE_METER_COMBAT_SESSION_UPDATED', 2, 2)
+    w.run(1)
+    check('en combate no se lee', stat('heal') == 0, stat('heal'))
+    a.g.COMBAT = False
+    a.fire('PLAYER_REGEN_ENABLED')
+    w.run(4)
+    check('al salir suma mi curación, no la de otros', stat('heal') == 500, stat('heal'))
+    a.fire('PLAYER_REGEN_ENABLED'); w.run(4)
+    check('leerla otra vez no suma de nuevo', stat('heal') == 500, stat('heal'))
+    session(2, 650)
+    a.fire('DAMAGE_METER_COMBAT_SESSION_UPDATED', 2, 2)
+    check('si la sesión sigue, solo lo nuevo', stat('heal') == 650, stat('heal'))
+    a.g.SECRETS[300] = True
+    session(3, 300)
+    a.fire('PLAYER_REGEN_ENABLED'); w.run(4)
+    check('valor oculto: espera', stat('heal') == 650, stat('heal'))
+    a.g.SECRETS[300] = None
+    a.fire('PLAYER_REGEN_ENABLED'); w.run(4)
+    check('cuando se puede leer: suma', stat('heal') == 950, stat('heal'))
+    a.rt.execute('DM_SESSIONS = {}; DM_DATA = {}')
+    a.fire('DAMAGE_METER_RESET')
+    session(1, 40)
+    a.fire('PLAYER_REGEN_ENABLED'); w.run(4)
+    check('tras reiniciar el medidor sigue sumando', stat('heal') == 990, stat('heal'))
+    no_errors(w, 'Cositas')
+
+TESTS = [t_cositas, lambda: t_names(0), lambda: t_names(1), lambda: t_names(2), t_migration, t_pvp, t_classic, t_sos,
          lambda: t_lfs(0), lambda: t_lfs(1), lambda: t_lfs(2), t_lfs_edges, t_ui, t_dungeons]
 
 for strict in ('', '1'):
