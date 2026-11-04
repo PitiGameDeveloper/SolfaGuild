@@ -10,10 +10,10 @@ local _, ns = ...
 local SG = ns.SG
 
 SG.Dungeons = {
-    { id = "rfc",    name = "Sima Ígnea", en = "Ragefire Chasm", min = 1, max = 18, bosses = { 11519, 11520 }, color = { 0.55, 0.16, 0.05 } },
-    { id = "thanes", name = "Salón de los Thanes", en = "Hall of Thanes", min = 1, max = 20, bosses = { 261319 }, color = { 0.45, 0.32, 0.16 } },
-    { id = "ruins",  name = "Ruinas de Lordaeron", en = "Ruins of Lordaeron", min = 1, max = 22, bosses = { 250657 }, color = { 0.22, 0.32, 0.26 } },
-    { id = "wc",     name = "Cuevas de los Lamentos", en = "Wailing Caverns", min = 2, max = 24, bosses = { 3654 }, color = { 0.10, 0.36, 0.22 } },
+    { id = "rfc",    name = "Sima Ígnea", en = "Ragefire Chasm", min = 13, max = 18, bosses = { 11519, 11520 }, color = { 0.55, 0.16, 0.05 } },
+    { id = "thanes", name = "Salón de los Thanes", en = "Hall of Thanes", min = 13, max = 20, bosses = { 261319 }, color = { 0.45, 0.32, 0.16 } },
+    { id = "ruins",  name = "Ruinas de Lordaeron", en = "Ruins of Lordaeron", min = 15, max = 22, bosses = { 250657 }, color = { 0.22, 0.32, 0.26 } },
+    { id = "wc",     name = "Cuevas de los Lamentos", en = "Wailing Caverns", min = 15, max = 24, bosses = { 3654 }, color = { 0.10, 0.36, 0.22 } },
     { id = "vc",     name = "Las Minas de la Muerte", en = "Deadmines", min = 17, max = 26, bosses = { 639 }, color = { 0.13, 0.36, 0.42 } },
     { id = "sfk",    name = "Castillo de Colmillo Oscuro", en = "Shadowfang Keep", min = 20, max = 30, bosses = { 4275 }, color = { 0.18, 0.24, 0.20 } },
     { id = "bfd",    name = "Cavernas de Brazanegra", en = "Blackfathom Deeps", min = 24, max = 32, bosses = { 4829 }, color = { 0.08, 0.20, 0.38 } },
@@ -46,6 +46,9 @@ SG.Dungeons = {
     { id = "stratu", name = "Stratholme (No-muertos)", en = "Stratholme", min = 58, max = 60, bosses = { 10440 }, color = { 0.20, 0.24, 0.28 } },
     { id = "scholo", name = "Scholomance", en = "Scholomance", min = 58, max = 60, bosses = { 1853 }, color = { 0.24, 0.18, 0.30 } },
 }
+
+-- PRUEBA TEMPORAL: todas las mazmorras a nivel 1. Quitar este bloque para volver a los niveles reales.
+for _, d in ipairs(SG.Dungeons) do d.min = 1 end
 
 -- Imagen de cada tarjeta: pantalla de carga del juego, por su identificador de archivo
 -- (los mismos que usa Attune en Forever). Las mazmorras nuevas de Forever que no están
