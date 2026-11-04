@@ -7,9 +7,19 @@
 -- enemigo en esos 20 s (no hace falta ir en grupo), se apunta el "equipo"
 -- (nombres de personaje ordenados). En la ventana se agrupa por cuenta, así
 -- que cuenta igual aunque vayan con alters y sigue al main que tenga cada uno.
+--
+-- En Forever no hay registro de combate (ver la sección "Forever"):
+-- - Un asesinato es una muerte honorable: el juego decide si cuenta o no. Un enemigo
+--   que no da honor (por ejemplo, gris para un nivel 60) no cuenta para ese jugador.
+-- - Asesinato coordinado: quien consigue una muerte honorable avisa a la guild con
+--   el identificador (GUID) del muerto, y si otros han avisado del mismo sois equipo.
+--   El aviso de honor no dice quién era: sale de los eventos UNIT_DIED y PARTY_KILL.
+--   Si alguno no lo tiene: misma zona, casi a la vez, y mismo grupo o mismo objetivo.
 
 local _, ns = ...
 local SG = ns.SG
+
+local Comm = SG.Comm
 
 local PvP = SG:RegisterModule("PvP", {})
 SG.PvP = PvP
@@ -48,13 +58,14 @@ local function teamKey(info)
     return table.concat(names, ",")
 end
 
-local function registerKill(destGUID, destName)
-    local now = GetTime()
-    if counted[destGUID] and now - counted[destGUID] < 60 then return end
-    counted[destGUID] = now
-    local info = recent[destGUID]
-    recent[destGUID] = nil
+local function addTeam(team)
+    local c = SG:MyChar()
+    SG:CheckWeek(c)
+    c.teams[team] = (c.teams[team] or 0) + 1
+    c.teamsWeek[team] = (c.teamsWeek[team] or 0) + 1
+end
 
+local function addKill(destName, team)
     local c = SG:MyChar()
     SG:CheckWeek(c)
     c.kills = (c.kills or 0) + 1
@@ -62,17 +73,22 @@ local function registerKill(destGUID, destName)
     local zone = GetRealZoneText() or GetZoneText() or "?"
     c.zones[zone] = (c.zones[zone] or 0) + 1
     c.zonesWeek[zone] = (c.zonesWeek[zone] or 0) + 1
-    local team = teamKey(info)
-    if team then
-        c.teams[team] = (c.teams[team] or 0) + 1
-        c.teamsWeek[team] = (c.teamsWeek[team] or 0) + 1
-    end
+    if team then addTeam(team) end
     SG:MarkDirty()
     SG:Debug("Asesinato PvP:", destName or "?", "en", zone, team and ("equipo " .. team) or "")
     SG:Fire("PVP_KILL", destName, zone)
 
     local total = SG.Milestones:MyTotals().kills
     SG.Milestones:Check("pvp", SG.Texts.pvpRanks, total, "RANGO PVP DESBLOQUEADO", { zone = zone })
+end
+
+local function registerKill(destGUID, destName)
+    local now = GetTime()
+    if counted[destGUID] and now - counted[destGUID] < 60 then return end
+    counted[destGUID] = now
+    local info = recent[destGUID]
+    recent[destGUID] = nil
+    addKill(destName, teamKey(info))
 end
 
 SG:On("COMBAT_LOG_EVENT_UNFILTERED", function()
@@ -126,6 +142,159 @@ C_Timer.NewTicker(30, function()
     end
     for g, t in pairs(counted) do if now - t > 120 then counted[g] = nil end end
 end)
+
+---------------------------------------------------------------------------
+-- Forever: sin registro de combate
+---------------------------------------------------------------------------
+local TEAM_TIME = 5        -- s de margen para juntar dos muertes sin identificador
+local ID_TIME = 15         -- s de margen para juntar dos muertes con el mismo identificador
+local TEAM_WAIT = 6        -- s esperando a que los demás digan que también les ha contado
+local DEATH_TIME = 6       -- s que una muerte vista puede ser la de una muerte honorable
+
+local lifetimeHK           -- muertes honorables de toda la vida (solo sube)
+local othersKilled = {}    -- { { who, t, zone, id, foe } } muertes honorables de los compañeros
+local deaths = {}          -- { { id, t, name, mine } } jugadores enemigos muertos sin asignar
+local lastFoe, lastFoeAt   -- último jugador enemigo que has tenido de objetivo y hasta cuándo
+local targetingFoe = false
+
+-- Facción de las razas que solo pueden ser de un bando. Los Skyborne eligen bando al
+-- crear el personaje, así que la raza no dice nada de ellos y no están aquí.
+local RACE_FACTION = {
+    Human = "Alliance", Dwarf = "Alliance", NightElf = "Alliance", Gnome = "Alliance",
+    Orc = "Horde", Scourge = "Horde", Tauren = "Horde", Troll = "Horde",
+}
+
+local function targetFoe()
+    if not (SG:Open(UnitExists("target")) and SG:Open(UnitIsPlayer("target"))) then return nil end
+    local mine, theirs = SG:Open(UnitFactionGroup("player")), SG:Open(UnitFactionGroup("target"))
+    if not mine or not theirs or mine == theirs then return nil end
+    return SG:UnitFull("target")
+end
+
+-- Solo sirve para saber si dos muertes honorables son la misma; nunca suma asesinatos
+local function currentFoe()
+    local foe = targetFoe()
+    if foe then return foe end
+    if lastFoe and GetTime() - lastFoeAt <= WINDOW then return lastFoe end
+end
+
+-- ¿Es de mi bando? Lo mejor es preguntárselo al juego, si lo tienes a la vista; si no,
+-- por la guild o por la raza. Si no se sabe (un Skyborne lejos), se da por enemigo:
+-- como mucho se asigna mal esta muerte y no sale como equipo, pero la kill cuenta igual.
+local function isMySide(guid, name, race)
+    local mine = SG:Open(UnitFactionGroup("player"))
+    local unit = UnitTokenFromGUID and SG:Open(UnitTokenFromGUID(guid))
+    local theirs = unit and SG:Open(UnitFactionGroup(unit))
+    if theirs then return theirs == mine end
+    if name and SG.roster[name] then return true end
+    local faction = race and RACE_FACTION[race]
+    return faction ~= nil and faction == mine
+end
+
+-- Muere alguien cerca: lo que no sea un jugador se descarta lo primero
+local function onDeathSeen(guid, mine)
+    guid = SG:Open(guid)
+    if type(guid) ~= "string" or not guid:find("^Player%-") then return end
+    local _, _, _, race, _, name = GetPlayerInfoByGUID(guid)
+    race, name = SG:Open(race), SG:Open(name)
+    name = name and SG:Short(name)
+    if isMySide(guid, name, race) then return end
+    local now = GetTime()
+    for _, d in ipairs(deaths) do
+        if d.id == guid and now - d.t <= DEATH_TIME then   -- llega por los dos eventos
+            d.mine = d.mine or mine
+            return
+        end
+    end
+    deaths[#deaths + 1] = { id = guid, t = now, name = name, mine = mine }
+end
+
+-- ¿Quién era el muerto de esta muerte honorable? Primero el que ha matado tu grupo,
+-- luego tu enemigo y, si no, el que lleva más tiempo sin asignar.
+local function takeDeath(foe)
+    local now = GetTime()
+    for i = #deaths, 1, -1 do
+        if now - deaths[i].t > DEATH_TIME then table.remove(deaths, i) end
+    end
+    local best
+    for i, d in ipairs(deaths) do
+        if d.mine then best = i; break end
+    end
+    if not best and foe then
+        for i, d in ipairs(deaths) do
+            if d.name == foe then best = i; break end
+        end
+    end
+    best = best or (deaths[1] and 1)
+    if best then return table.remove(deaths, best).id end
+end
+
+-- ¿Es la misma muerte? Con identificador en los dos, se mira solo eso.
+local function sameKill(k, killedAt, zone, id, foe)
+    if id and k.id then return k.id == id and math.abs(k.t - killedAt) <= ID_TIME end
+    if k.zone ~= zone or math.abs(k.t - killedAt) > TEAM_TIME then return false end
+    return (foe and k.foe == foe) or SG:InMyGroup(k.who)
+end
+
+-- Unos segundos después de cada asesinato: ¿a quién más le ha contado esta misma muerte?
+local function closeTeam(killedAt, zone, id, foe)
+    local names, added = { SG:MyName() }, {}
+    for _, k in ipairs(othersKilled) do
+        if not added[k.who] and sameKill(k, killedAt, zone, id, foe) then
+            added[k.who] = true
+            names[#names + 1] = k.who
+        end
+    end
+    if #names >= 2 then
+        table.sort(names)
+        addTeam(table.concat(names, ","))
+    end
+end
+
+-- El contador de muertes honorables ha subido
+local function onHonorableKill()
+    local hk = SG:Open((GetPVPLifetimeStats()))
+    if type(hk) ~= "number" then return end
+    local gained = lifetimeHK and (hk - lifetimeHK) or 0
+    lifetimeHK = hk
+    if gained <= 0 or not inOpenWorld() or not SG:Feature("pvp") then return end
+    local now = GetTime()
+    local zone = GetRealZoneText() or GetZoneText() or "?"
+    local foe = currentFoe()
+    for _ = 1, gained do
+        local id = takeDeath(foe)
+        addKill(nil)
+        SG:Debug("Muerte honorable. Identificador:", id or "ninguno", "- objetivo:", foe or "ninguno")
+        Comm:Send({ t = "PK", z = zone, id = id, foe = foe }, "GUILD")
+        C_Timer.After(TEAM_WAIT, function() SG:Try(closeTeam, now, zone, id, foe) end)
+    end
+end
+
+if not SG.HasCombatLog then
+    SG:On("PLAYER_PVP_KILLS_CHANGED", function()
+        -- un momento para que el contador ya esté al día
+        C_Timer.After(1, function() SG:Try(onHonorableKill) end)
+    end)
+    SG:On("UNIT_DIED", function(guid) onDeathSeen(guid, false) end)
+    SG:On("PARTY_KILL", function(_, guid) onDeathSeen(guid, true) end)
+    SG:On("PLAYER_TARGET_CHANGED", function()
+        local foe = targetFoe()
+        if foe then lastFoe = foe end
+        if foe or targetingFoe then lastFoeAt = GetTime() end
+        targetingFoe = foe ~= nil
+    end)
+    SG:On("PLAYER_ENTERING_WORLD", function()
+        if not lifetimeHK then lifetimeHK = SG:Open((GetPVPLifetimeStats())) end
+    end)
+    Comm:Register("PK", function(msg, sender)
+        if type(msg.z) ~= "string" or not SG:IsGuildMember(sender) then return end
+        local now = GetTime()
+        for i = #othersKilled, 1, -1 do
+            if now - othersKilled[i].t > 60 then table.remove(othersKilled, i) end
+        end
+        othersKilled[#othersKilled + 1] = { who = sender, t = now, zone = msg.z, id = msg.id, foe = msg.foe }
+    end)
+end
 
 ---------------------------------------------------------------------------
 -- Estadísticas de guild (week = true: solo esta semana)
@@ -197,32 +366,13 @@ function PvP:Teams(week)
     return arr
 end
 
--- Escalafón: los jugadores con asesinatos llenan los rangos de Texts.pvpLadder
--- en orden. Devuelve { { name, members = { {acc, value} } } } solo con rangos
--- ocupados, y aparte tu cuenta si aún no tiene asesinatos.
+-- Escalafón (ver Texts.pvpLadder)
 function PvP:Ladder(week)
     local list = SG:Ranking(function(a) return week and SG:AccountWeekKills(a) or SG:AccountSum(a, "kills") end)
-    local out, idx = {}, 1
-    for _, tier in ipairs(SG.Texts.pvpLadder) do
-        local members = {}
-        while list[idx] and list[idx].value > 0 and (not tier.players or #members < tier.players) do
-            members[#members + 1] = list[idx]
-            idx = idx + 1
-        end
-        if #members > 0 then out[#out + 1] = { name = SG:Fmt(tier.name), members = members } end
-    end
-    local nobody
-    for i = idx, #list do
-        if list[i].acc.mine then nobody = list[i] end
-    end
-    return out, nobody
+    return SG:BuildLadder(list, SG.Texts.pvpLadder)
 end
 
 -- Rango del escalafón de una cuenta (nil = sin asesinatos)
 function PvP:LadderRankOf(acc, week)
-    for _, tier in ipairs(self:Ladder(week)) do
-        for _, it in ipairs(tier.members) do
-            if it.acc.id == acc.id then return tier.name end
-        end
-    end
+    return SG:LadderRankOf(self:Ladder(week), acc)
 end

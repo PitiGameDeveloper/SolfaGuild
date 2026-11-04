@@ -106,6 +106,7 @@ sendFrame:Hide()
 -- Envía una tabla { t = "TIPO", ... }
 function Comm:Send(msg, channel, target)
     channel = channel or "GUILD"
+    if target then target = SG:Target(target) end
     if channel == "GUILD" and not IsInGuild() then return end
     local data = self:Serialize(msg)
     msgCounter = (msgCounter + 1) % 1000
@@ -143,8 +144,10 @@ end
 
 SG:On("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     if prefix ~= SG.PREFIX then return end
+    local raw = sender
     sender = SG:Short(sender)
     if not sender or sender == SG:MyName() then return end
+    SG.rawNames[sender] = raw
     local id, idx, total, piece = text:match("^(%d+)\t(%d+)\t(%d+)\t(.*)$")
     if not id then return end
     idx, total = tonumber(idx), tonumber(total)

@@ -175,7 +175,8 @@ local function tick()
 
     local afk = UnitIsAFK("player")
     if not afk and IsSwimming() then add("swim", TICK) end
-    if not afk and GetZonePVPInfo and GetZonePVPInfo() == "hostile" then add("enemyLand", TICK) end
+    local zoneInfo = (C_PvP and C_PvP.GetZonePVPInfo) or GetZonePVPInfo
+    if not afk and zoneInfo and zoneInfo() == "hostile" then add("enemyLand", TICK) end
     if UnitIsGhost("player") then add("ghost", TICK) end
     if inGroup() then add("group", TICK) end
 end
@@ -198,7 +199,7 @@ function Cos:OnLogin()
     herbName = spellName(HERB_SPELL)
     refreshEnabled()
 
-    cl:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    if SG.HasCombatLog then cl:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED") end
     if spells.RegisterUnitEvent then
         spells:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
     else

@@ -12,16 +12,15 @@ S.defaults = {
     ver = 0, by = "",
     features = {
         pvp = true, gold = true, dungeons = true, playtime = true, cositas = true,
-        dungeonHelper = true, whisperIcon = true, inviteIcon = true,
+        lfs = true, whisperIcon = true, inviteIcon = true,
         zoneNotify = true, events = true, campSOS = true,
     },
     zoneCooldown = 30,      -- minutos entre avisos de la misma zona
     eventReminder = 10,     -- minutos de antelación del aviso de evento
     campDeaths = 2,         -- muertes a manos de enemigos para considerar campeo...
     campWindow = 10,        -- ...dentro de estos minutos
-    dhBelow = 2,            -- niveles por debajo del nivel de desbloqueo
-    dhAbove = 4,            -- niveles por encima que aún "renta"
-    dhMaxLevel = 59,        -- a partir de 60 se desactiva el ayudante
+    lfsOfferTime = 30,      -- segundos para contestar a una oferta del LFS
+    lfsRelogTime = 5,       -- minutos para entrar con otro personaje tras aceptar
     eventRanks = { [0] = true, [1] = true },  -- rangos de guild que pueden crear eventos
     eventNames = {},        -- mains con permiso a dedo: [nombre] = true
 }

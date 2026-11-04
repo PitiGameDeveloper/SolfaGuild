@@ -1,0 +1,583 @@
+"""Simulación del addon sin el juego: carga el addon real en varios clientes con la API
+de WoW falsa (mock.lua) y un mundo con reloj, guild, grupos y mensajes (world.py).
+Prueba la lógica, no que Forever se comporte como aquí se supone, ni cómo se ve nada.
+
+    python -m pip install -r tests/requirements.txt
+    python tests/run.py
+
+Se ejecuta dos veces: la segunda sin las funciones antiguas que Forever puede no tener.
+Termina con error si falla algo.
+"""
+import os, sys, traceback
+sys.stdout.reconfigure(encoding='utf-8')
+from world import World
+
+fails, passes = [], 0
+def check(name, cond, detail=''):
+    global passes
+    if cond:
+        passes += 1
+        print('  ok   ', name)
+    else:
+        fails.append(name)
+        print('  FALLO', name, detail)
+
+def kills(c): return c.ret('SG:MyChar().kills') or 0
+def team_keys(c):
+    t = c.ret('SG:MyChar().teams')
+    return sorted(k for k, _ in t.items()) if t else []
+def no_errors(w, label):
+    e = w.all_errors()
+    check('%s: sin errores' % label, not e, str(e[:4]))
+
+def hk(c, n=1):
+    c.g.HK = c.ret('HK') + n
+    c.fire('PLAYER_PVP_KILLS_CHANGED')
+
+def base(forever=True, fmt=0):
+    w = World(forever, fmt)
+    def ch(cl, lvl): return {'class': cl, 'level': lvl}
+    a = w.add('a', {'Ana Uno': ch('WARRIOR', 40)}, 'Ana Uno')
+    b = w.add('b', {'Beto Dos': ch('MAGE', 40)}, 'Beto Dos')
+    c = w.add('c', {'Ciro Tres': ch('ROGUE', 40)}, 'Ciro Tres')
+    return w, a, b, c
+
+# ------------------------------------------------------------------ nombres
+def t_names(fmt):
+    print('\n== Nombres y sincronización (formato de remitente %d) ==' % fmt)
+    w, a, b, c = base(True, fmt)
+    w.start()
+    check('MyName con apellido', a.ret('SG:MyName()') == 'Ana Uno')
+    for raw, want in [('Ana Uno-Reino', 'Ana Uno'), ('Ana-Uno-Reino', 'Ana Uno'), ('Ana-Uno', 'Ana Uno'), ('Ana Uno', 'Ana Uno')]:
+        check('Short(%s)' % raw, a.ret('SG:Short(%r)' % raw) == want, a.ret('SG:Short(%r)' % raw))
+    check('se ve en el roster', bool(a.ret('SG.roster["Beto Dos"] and SG.roster["Beto Dos"].online')))
+    check('me reconozco en el roster', bool(a.ret('SG.roster[SG:MyName()] ~= nil')))
+    check('ve la cuenta de otro', a.ret('SG:AccountOf("Beto Dos") ~= nil'))
+    check('miembro de guild por remitente', a.ret('SG:IsGuildMember(%r)' % w.sender_raw('Beto Dos')))
+    check('ningún susurro a nombre inválido', not w.failed_targets, str(w.failed_targets[:3]))
+    no_errors(w, 'nombres')
+
+def t_migration():
+    print('\n== Migración de personaje guardado con nombre corto ==')
+    w = World(True)
+    a = w.add('a', {'Ana Uno': {'class': 'MAGE', 'level': 20}}, 'Ana Uno')
+    a.ev('SolfaGuildDB.my.chars["Ana"] = { class = "MAGE", level = 20, kills = 7, guild = "Los Solfamidas", dungeons = {} }; SolfaGuildDB.my.chars["Ana Uno"] = nil; SolfaGuildDB.my.main = "Ana"')
+    w.start(5)
+    check('kills conservados', a.ret('SG.db.my.chars["Ana Uno"] and SG.db.my.chars["Ana Uno"].kills') == 7)
+    check('nombre corto borrado', a.ret('SG.db.my.chars["Ana"] == nil'))
+    check('main actualizado', a.ret('SG.db.my.main') == 'Ana Uno')
+    no_errors(w, 'migración')
+
+# ------------------------------------------------------------------ PvP
+def died(cs, guid, party_of=()):
+    for c in cs:
+        c.fire('UNIT_DIED', guid)
+    for c in party_of:
+        c.fire('PARTY_KILL', c.ret('UnitGUID("player")'), guid)
+
+def t_pvp():
+    print('\n== PvP en Forever ==')
+    w, a, b, c = base(); w.start()
+    check('Forever no registra el registro de combate', a.ret('#FORBIDDEN') == 0, a.ret('#FORBIDDEN'))
+    for x in (a, b, c):
+        x.g.PLAYERS['Player-9-Malo'] = x.rt.table_from({'class': 'PALADIN', 'race': 'Human', 'name': 'Malo Ali'})
+        x.g.PLAYERS['Player-9-Feo'] = x.rt.table_from({'class': 'PRIEST', 'race': 'Dwarf', 'name': 'Feo Ali'})
+        x.g.PLAYERS['Player-9-Otro'] = x.rt.table_from({'class': 'MAGE', 'race': 'Gnome', 'name': 'Otro Ali'})
+
+    print(' parado al lado de una pelea ajena')
+    n = len(w.sent)
+    died((a, b, c), 'Player-9-Malo')
+    w.run(10)
+    check('no sube ninguna kill', (kills(a), kills(b), kills(c)) == (0, 0, 0))
+    check('no avisa a nadie', not [s for s in w.sent[n:] if s[0] == 'PK'])
+
+    print(' 2v2: los dos consiguen las dos muertes')
+    died((a, b), 'Player-9-Malo', (a,))
+    hk(a); hk(b)
+    w.run(2)
+    died((a, b), 'Player-9-Feo', (b,))
+    hk(a); hk(b)
+    print(' ...y a la vez Ciro mata a otro en un 1v1')
+    died((c,), 'Player-9-Otro', (c,))
+    hk(c)
+    w.run(12)
+    check('Ana 2 kills', kills(a) == 2, kills(a))
+    check('Beto 2 kills', kills(b) == 2, kills(b))
+    check('Ciro 1 kill', kills(c) == 1, kills(c))
+    check('Ana: 2 asesinatos con Beto', a.ret('SG:MyChar().teams["Ana Uno,Beto Dos"]') == 2, team_keys(a))
+    check('Ciro sin equipo', team_keys(c) == [], team_keys(c))
+    check('Ana sin Ciro en equipos', 'Ciro' not in ''.join(team_keys(a)), team_keys(a))
+    check('ventana: un equipo de 2 cuentas', a.ret('#SG.PvP:Teams(false)') == 1, a.ret('#SG.PvP:Teams(false)'))
+    no_errors(w, 'PvP 2v2')
+
+    print(' un nivel 60 ayuda a un nivel 20 (al 60 no le da honor)')
+    w, a, b, c = base(); w.start()
+    for x in (a, b):
+        x.g.PLAYERS['Player-9-Malo'] = x.rt.table_from({'class': 'PALADIN', 'race': 'Human', 'name': 'Malo Ali'})
+    died((a, b), 'Player-9-Malo', (a,))
+    hk(a)
+    w.run(10)
+    check('al 20 le cuenta', kills(a) == 1)
+    check('al 60 no le cuenta', kills(b) == 0)
+    check('no es asesinato en grupo', team_keys(a) == [], team_keys(a))
+    no_errors(w, 'PvP 20+60')
+
+    print(' mismo segundo y misma zona, ids distintas')
+    w, a, b, c = base(); w.start()
+    for x in (a, b):
+        x.g.PLAYERS['Player-9-Malo'] = x.rt.table_from({'class': 'PALADIN', 'race': 'Human', 'name': 'Malo Ali'})
+        x.g.PLAYERS['Player-9-Feo'] = x.rt.table_from({'class': 'PRIEST', 'race': 'Dwarf', 'name': 'Feo Ali'})
+    died((a,), 'Player-9-Malo', (a,)); died((b,), 'Player-9-Feo', (b,))
+    hk(a); hk(b)
+    w.run(10)
+    check('una kill cada uno', (kills(a), kills(b)) == (1, 1))
+    check('no hay equipo', team_keys(a) == [] and team_keys(b) == [], team_keys(a))
+
+    print(' ids distintas aunque vayan en el mismo grupo')
+    w, a, b, c = base(); w.start()
+    for x in (a, b):
+        x.g.PLAYERS['Player-9-Malo'] = x.rt.table_from({'class': 'PALADIN', 'race': 'Human', 'name': 'Malo Ali'})
+        x.g.PLAYERS['Player-9-Feo'] = x.rt.table_from({'class': 'PRIEST', 'race': 'Dwarf', 'name': 'Feo Ali'})
+    w.make_group(a, b)
+    died((a,), 'Player-9-Malo', (a,)); died((b,), 'Player-9-Feo', (b,))
+    hk(a); hk(b)
+    w.run(10)
+    check('no hay equipo', team_keys(a) == [], team_keys(a))
+
+    print(' sin id: reserva por grupo y por objetivo')
+    w, a, b, c = base(); w.start()
+    w.make_group(a, b)
+    hk(a); hk(b)
+    w.run(10)
+    check('mismo grupo sin id: equipo', a.ret('SG:MyChar().teams["Ana Uno,Beto Dos"]') == 1, team_keys(a))
+    w, a, b, c = base(); w.start()
+    a.set_unit('target', 'Malo', 'Ali'); b.set_unit('target', 'Malo', 'Ali')
+    a.fire('PLAYER_TARGET_CHANGED'); b.fire('PLAYER_TARGET_CHANGED')
+    hk(a); hk(b)
+    w.run(10)
+    check('mismo objetivo sin id: equipo', a.ret('SG:MyChar().teams["Ana Uno,Beto Dos"]') == 1, team_keys(a))
+    w, a, b, c = base(); w.start()
+    a.set_unit('target', 'Malo', 'Ali'); b.set_unit('target', 'Feo', 'Ali')
+    a.fire('PLAYER_TARGET_CHANGED'); b.fire('PLAYER_TARGET_CHANGED')
+    hk(a); hk(b)
+    w.run(10)
+    check('distinto objetivo sin id: sin equipo', team_keys(a) == [], team_keys(a))
+    w, a, b, c = base(); w.start()
+    hk(a); hk(b)
+    w.run(10)
+    check('sin nada en común: sin equipo', team_keys(a) == [] and kills(a) == 1, team_keys(a))
+    no_errors(w, 'PvP reserva')
+
+    print(' identificador oculto por el juego')
+    w, a, b, c = base(); w.start()
+    a.g.SECRETS['GUIDOCULTO'] = True
+    a.fire('UNIT_DIED', 'GUIDOCULTO'); a.fire('PARTY_KILL', 'x', 'GUIDOCULTO')
+    hk(a)
+    w.run(10)
+    check('kill cuenta igual', kills(a) == 1)
+    no_errors(w, 'PvP oculto')
+
+    print(' bandos: Skyborne, guild y muertes de mi facción')
+    w, a, b, c = base(); w.start()
+    a.g.PLAYERS['Player-9-Sky'] = a.rt.table_from({'class': 'DRUID', 'race': 'Skyborne', 'name': 'Sky Ali'})
+    a.g.PLAYERS['Player-8-Horda'] = a.rt.table_from({'class': 'MAGE', 'race': 'Orc', 'name': 'Otro Horda'})
+    a.g.PLAYERS['Player-8-Sky'] = a.rt.table_from({'class': 'DRUID', 'race': 'Skyborne', 'name': 'Sky Horda'})
+    a.g.PLAYERS['Player-1-Beto'] = a.rt.table_from({'class': 'MAGE', 'race': 'Skyborne', 'name': 'Beto Dos'})
+    a.ev('SG.db.debug = true')
+    a.fire('UNIT_DIED', 'Player-8-Horda')
+    a.fire('UNIT_DIED', 'Player-1-Beto')
+    a.set_unit('nameplate1', 'Sky', 'Horda', faction='Horde', guid='Player-8-Sky')
+    a.fire('UNIT_DIED', 'Player-8-Sky')
+    a.clear_unit('nameplate1')
+    w.run(1)
+    hk(a)
+    w.run(3)
+    last = [p for p in a.prints if 'Muerte honorable' in p][-1]
+    check('orco, compañero y Skyborne de mi bando: descartados', 'ninguno' in last.split('objetivo')[0], last)
+    a.fire('UNIT_DIED', 'Player-9-Sky')
+    hk(a)
+    w.run(3)
+    last = [p for p in a.prints if 'Muerte honorable' in p][-1]
+    check('Skyborne enemigo: asignado', 'Player-9-Sky' in last, last)
+    check('las dos kills cuentan', kills(a) == 2, kills(a))
+    no_errors(w, 'PvP bandos')
+
+    print(' en instancia no cuenta; el contador no salta al entrar')
+    w, a, b, c = base(); w.start()
+    a.g.INST, a.g.INST_KIND = True, 'pvp'
+    hk(a)
+    w.run(3)
+    a.g.INST, a.g.INST_KIND = False, 'none'
+    check('en campo de batalla: 0', kills(a) == 0)
+    hk(a)
+    w.run(3)
+    check('siguiente en mundo abierto: 1 (no 2)', kills(a) == 1, kills(a))
+    hk(a, 2)
+    w.run(3)
+    check('contador sube de 2 en 2: suma 2', kills(a) == 3, kills(a))
+    no_errors(w, 'PvP instancia')
+
+    print(' /sg debug y escalafón')
+    w, a, b, c = base(); w.start()
+    a.ev('SG.db.debug = true')
+    a.g.PLAYERS['Player-9-Malo'] = a.rt.table_from({'class': 'PALADIN', 'race': 'Human', 'name': 'Malo Ali'})
+    died((a,), 'Player-9-Malo', (a,))
+    hk(a)
+    w.run(3)
+    check('debug enseña la id', any('Player-9-Malo' in p for p in a.prints), a.prints[-3:])
+    check('sale en el escalafón', a.ret('#SG.PvP:Ladder(false)') == 1)
+    check('rango del escalafón', a.ret('SG.PvP:LadderRankOf(SG:MyAccount())') is not None)
+    no_errors(w, 'PvP debug')
+
+# ------------------------------------------------------------------ Classic
+def t_classic():
+    print('\n== Classic Era sigue con el registro de combate ==')
+    w = World(False)
+    a = w.add('a', {'Ana': {'class': 'WARRIOR', 'level': 40}}, 'Ana')
+    b = w.add('b', {'Beto': {'class': 'MAGE', 'level': 40}}, 'Beto')
+    w.start()
+    check('nombre sin apellido', a.ret('SG:MyName()') == 'Ana')
+    check('Short quita el reino', a.ret('SG:Short("Ana-Reino")') == 'Ana')
+    check('HasCombatLog', a.ret('SG.HasCombatLog') is True)
+    me = a.ret('UnitGUID("player")')
+    flags_me, enemy = 0x1 | 0x400, 0x400 | 0x40
+    def cl(sub, src, sf, dst, dn, df):
+        a.rt.execute('CL_EVENT = {0, %r, false, %r, "x", %d, 0, %r, %r, %d}' % (sub, src, sf, dst, dn, df))
+        a.fire('COMBAT_LOG_EVENT_UNFILTERED')
+    cl('SWING_DAMAGE', me, flags_me, 'Player-9-M', 'Malo', enemy)
+    cl('UNIT_DIED', '', 0, 'Player-9-M', 'Malo', enemy)
+    w.run(1)
+    check('asesinato contado', kills(a) == 1, kills(a))
+    no_errors(w, 'Classic')
+
+# ------------------------------------------------------------------ SOS
+def t_sos():
+    print('\n== SOS por campeo en Forever ==')
+    w, a, b, c = base(); w.start()
+    def recap(guid, name):
+        a.rt.execute('RECAP = { { timestamp = 1, sourceGUID = "x", sourceName = "viejo" }, { timestamp = %d, sourceGUID = %r, sourceName = %r } }' % (int(w.now) + 2, guid, name))
+    print(' un monstruo te mata')
+    recap('Creature-0-1-1-1-100-1', 'Lobo')
+    a.fire('PLAYER_DEAD'); w.run(35)
+    a.fire('PLAYER_DEAD'); w.run(35)
+    check('no pregunta', not a.shown('SolfaGuildCampAsk'))
+    print(' un jugador te mata dos veces; el juego repite PLAYER_DEAD al liberar')
+    recap('Player-9-Malo', 'Malo-Ali')
+    a.fire('PLAYER_DEAD'); w.run(2)
+    a.fire('PLAYER_DEAD'); w.run(2)
+    check('una muerte no basta', not a.shown('SolfaGuildCampAsk'))
+    w.run(30)
+    a.fire('PLAYER_DEAD'); w.run(2)
+    check('a las 2 muertes pregunta', a.shown('SolfaGuildCampAsk'))
+    txt = a.ret('SolfaGuildCampAsk.text:GetText()')
+    check('nombra al asesino', 'Malo Ali' in txt, txt)
+    print(' pide refuerzos y acude Beto, que está en otro grupo')
+    w.make_group(b, c)
+    a.ev('SolfaGuildCampAsk.yes:Click()')
+    w.run(2)
+    check('a Beto le sale el aviso', b.shown('SolfaGuildCampCall'))
+    b.ev('SolfaGuildCampCall.yes:Click()')
+    w.run(3)
+    check('Beto ha salido de su grupo', w.group_of(c) is None or b not in w.group_of(c)['members'])
+    check('Beto está con Ana', w.group_of(a) is not None and b in w.group_of(a)['members'], w.invite_targets)
+    check('invitación con nombre válido', not w.failed_targets, w.failed_targets)
+    no_errors(w, 'SOS')
+    print(' resumen vacío u oculto')
+    w, a, b, c = base(); w.start()
+    a.fire('PLAYER_DEAD'); w.run(35); a.fire('PLAYER_DEAD'); w.run(2)
+    check('sin resumen no cuenta', not a.shown('SolfaGuildCampAsk'))
+    a.g.SECRETS['OCULTO'] = True
+    a.rt.execute('RECAP = { { timestamp = 5, sourceGUID = "OCULTO", sourceName = "OCULTO" } }')
+    w.run(35); a.fire('PLAYER_DEAD'); w.run(2)
+    check('GUID oculto no cuenta', not a.shown('SolfaGuildCampAsk'))
+    a.rt.execute('RECAP = { { timestamp = 5, sourceGUID = "Player-9-M", sourceName = "OCULTO" } }')
+    w.run(35); a.fire('PLAYER_DEAD'); w.run(2)
+    w.run(35); a.fire('PLAYER_DEAD'); w.run(2)
+    check('nombre oculto cuenta con "?"', a.shown('SolfaGuildCampAsk'))
+    no_errors(w, 'SOS oculto')
+
+# ------------------------------------------------------------------ LFS
+def lfs_world(fmt=0):
+    w = World(True, fmt)
+    def ch(cl, lvl, done=()): return {'class': cl, 'level': lvl, 'done': list(done)}
+    L = w.add('L', {'Lider Uno': ch('WARLOCK', 20)}, 'Lider Uno')
+    B = w.add('B', {'Tanque Dos': ch('WARRIOR', 20)}, 'Tanque Dos')
+    M = w.add('M', {'Mago Tres': ch('MAGE', 21)}, 'Mago Tres')
+    G = w.add('G', {'Mini Siete': ch('WARRIOR', 8), 'Druida Siete': ch('DRUID', 19)}, 'Mini Siete')
+    C = w.add('C', {'Cura Cuatro': ch('PRIEST', 18, ['vc'])}, 'Cura Cuatro')
+    E = w.add('E', {'Rogue Cinco': ch('ROGUE', 60)}, 'Rogue Cinco')
+    F = w.add('F', {'Bajo Seis': ch('PALADIN', 5)}, 'Bajo Seis')
+    O = w.add('O', {'Otro Ocho': ch('MAGE', 40)}, 'Otro Ocho')
+    N = w.add('N', {'Sinad Nueve': ch('WARRIOR', 20)}, 'Sinad Nueve', has_addon=False)
+    return w, L, B, M, G, C, E, F, O, N
+
+def offer(c): return c.shown('SolfaGuildLFSOffer')
+def radios(c):
+    out = {}
+    for i in range(1, 4):
+        if c.ret('SolfaGuildLFSOffer.radios[%d]:IsShown()' % i):
+            out[c.ret('SolfaGuildLFSOffer.radios[%d].role' % i)] = i
+    return out
+def pick(c, role):
+    c.ev('SolfaGuildLFSOffer.radios[%d]:Click()' % radios(c)[role])
+def yes(c): c.ev('SolfaGuildLFSOffer.yes:Click()')
+def no(c): c.ev('SolfaGuildLFSOffer.no:Click()')
+def start(L, t=1, h=1, d=2, dg='vc'):
+    return L.rt.eval('(function() local ok, why = SG.LFS:Start(SG.DungeonById[%r], { T = %d, H = %d, D = %d }); return ok, why end)()' % (dg, t, h, d))
+
+def t_lfs(fmt=0):
+    print('\n== LFS completo (Minas 17-26: tanque, sanador, 2 DPS; remitente %d) ==' % fmt)
+    w, L, B, M, G, C, E, F, O, N = lfs_world(fmt); w.start()
+    names = lambda need: [L.ret('SG.LFS:Candidates(SG.DungeonById.vc, %s)[%d].char' % (need, i)) for i in range(1, L.ret('#SG.LFS:Candidates(SG.DungeonById.vc, %s)' % need) + 1)]
+    order = names('{T=1,H=1,D=2}')
+    print('   orden:', order)
+    check('prioridad: en rango sin hacer > hecha > por encima', order == ['Tanque Dos', 'Mago Tres', 'Druida Siete', 'Cura Cuatro', 'Otro Ocho', 'Rogue Cinco'], order)
+    check('por debajo del mínimo, nunca', 'Bajo Seis' not in order and 'Mini Siete' not in order)
+    check('sin addon, nunca', 'Sinad Nueve' not in order)
+    w.make_group(B, O)
+    ok = start(L)
+    check('arranca', ok is True or (isinstance(ok, tuple) and ok[0] is True), ok)
+    w.run(1)
+    print(' 1) oferta a Tanque Dos, que está en otro grupo')
+    check('le sale la oferta', offer(B))
+    check('solo una oferta a la vez', not offer(M) and not offer(C) and not offer(E))
+    check('guerrero: tanque o DPS', sorted(radios(B)) == ['D', 'T'], radios(B))
+    check('sin marcar no se puede aceptar', B.ret('SolfaGuildLFSOffer.yes:IsEnabled()') is False)
+    text = B.ret('SolfaGuildLFSOffer.text:GetText()')
+    check('texto con mazmorra, personaje y aviso', 'Minas' in text and 'Tanque Dos' in text and '20' in text and 'echará' in text, text)
+    pick(B, 'T'); yes(B)
+    w.run(2)
+    check('ha salido de su grupo', B not in (w.group_of(O) or {'members': []})['members'])
+    check('está en el grupo del líder', w.group_of(L) and B in w.group_of(L)['members'], (w.invite_targets, w.failed_targets, L.prints[-3:]))
+    print(' 2) falta sanador y 2 DPS: rechaza el mago')
+    check('le toca al mago', offer(M))
+    check('mago: solo DPS y ya marcado', list(radios(M)) == ['D'] and M.ret('SolfaGuildLFSOffer.radios[1]:GetChecked()') is True, radios(M))
+    check('puede aceptar sin tocar nada', M.ret('SolfaGuildLFSOffer.yes:IsEnabled()') is True)
+    no(M)
+    w.run(1)
+    print(' 3) el alter de otro jugador: druida, ya sin opción de tanque')
+    check('le toca a la cuenta del druida', offer(G))
+    check('sin tanque en las opciones', sorted(radios(G)) == ['D', 'H'], radios(G))
+    gt = G.ret('SolfaGuildLFSOffer.text:GetText()')
+    check('le dice que entre con el alter', 'Druida Siete' in gt and 'entrar con' in gt, gt)
+    pick(G, 'H'); yes(G)
+    w.run(2)
+    check('plaza guardada, no se invita aún', G not in w.group_of(L)['members'])
+    check('pendiente guardado', G.ret('SG.db.my.lfsPending ~= nil'))
+    print(' 4) solo faltan 2 DPS: dos ofertas a la vez')
+    check('oferta a Cura', offer(C))
+    check('oferta a la siguiente cuenta', offer(O))
+    check('Rogue aún no', not offer(E))
+    check('sanador sin opción de curar', list(radios(C)) == ['D'], radios(C))
+    yes(C); yes(O)
+    w.run(2)
+    check('Cura dentro', C in w.group_of(L)['members'])
+    check('Otro dentro', O in w.group_of(L)['members'])
+    check('Rogue nunca recibió oferta', not offer(E))
+    print(' 5) entra con el alter')
+    check('aún no ha acabado', L.ret('SG.LFS:Run() ~= nil'))
+    w.switch_char(G, 'Druida Siete')
+    w.run(8)
+    check('alter dentro', G in w.group_of(L)['members'], L.prints[-3:])
+    check('grupo de 5', len(w.group_of(L)['members']) == 5, len(w.group_of(L)['members']))
+    w.run(2)
+    check('búsqueda acabada', L.ret('SG.LFS:Run() == nil'))
+    check('mensaje de grupo completo', any('completo' in p for p in L.prints), L.prints[-2:])
+    check('sin destinos inválidos', not w.failed_targets, w.failed_targets[:3])
+    no_errors(w, 'LFS completo')
+
+def t_lfs_edges():
+    print('\n== LFS: casos raros ==')
+    w, L, B, M, G, C, E, F, O, N = lfs_world(); w.start()
+    print(' no contesta nadie: pasa al siguiente a los 30 s')
+    start(L, 1, 0, 0)
+    w.run(1)
+    check('Tanque Dos tiene oferta', offer(B))
+    w.run(36)
+    check('se le cierra la ventana', not offer(B))
+    check('pasa a otro', offer(G) or offer(C) or offer(E), L.ret('SG.LFS:Run() ~= nil'))
+    L.ev('SG.LFS:Cancel()')
+    w.run(1)
+    check('cancelar cierra las ofertas', not (offer(G) or offer(C) or offer(E)))
+    check('sin búsqueda', L.ret('SG.LFS:Run() == nil'))
+    no_errors(w, 'LFS sin respuesta')
+
+    print(' cliente sin respuesta: se salta en 5 s')
+    w, L, B, M, G, C, E, F, O, N = lfs_world(); w.start()
+    B.has_addon = False
+    start(L, 1, 0, 0)
+    w.run(7)
+    check('pasa al siguiente enseguida', offer(G), L.prints[-2:])
+    L.ev('SG.LFS:Cancel()')
+
+    print(' en combate o en instancia: se salta')
+    w, L, B, M, G, C, E, F, O, N = lfs_world(); w.start()
+    B.g.COMBAT = True
+    start(L, 1, 0, 0)
+    w.run(1)
+    check('en combate no ve la oferta', not offer(B))
+    check('siguiente', offer(G))
+    L.ev('SG.LFS:Cancel()')
+    w.run(1)
+    B.g.COMBAT = False
+    B.g.INST = True
+    M.g.INST = True
+    start(L, 0, 0, 1)
+    w.run(1)
+    check('en instancia no ve la oferta', not offer(B) and not offer(M))
+    L.ev('SG.LFS:Cancel()')
+
+    print(' reglas de inicio')
+    w, L, B, M, G, C, E, F, O, N = lfs_world(); w.start()
+    w.make_group(M, L)
+    r = L.rt.eval('(function() local ok, why = SG.LFS:Start(SG.DungeonById.vc, {T=1,H=0,D=0}); return why end)()')
+    check('sin ser líder no deja', r and 'líder' in r, r)
+    w.leave(L)
+    w.run(1)
+    r = L.rt.eval('(function() local ok, why = SG.LFS:Start(SG.DungeonById.vc, {T=0,H=0,D=0}); return why end)()')
+    check('sin elegir nada no deja', r and 'Elige' in r, r)
+    r = L.rt.eval('(function() local ok, why = SG.LFS:Start(SG.DungeonById.vc, {T=1,H=1,D=3}); return why end)()')
+    check('más de 4 no deja', r and 'plazas' in r, r)
+    w.make_group(L, M, E, C)
+    w.run(1)
+    r = L.rt.eval('(function() local ok, why = SG.LFS:Start(SG.DungeonById.vc, {T=1,H=1,D=0}); return why end)()')
+    check('con 4 en grupo solo queda 1 plaza', r and 'plazas' in r, r)
+    no_errors(w, 'LFS inicio')
+
+    print(' sin candidatos a mitad: acaba y avisa')
+    w, L, B, M, G, C, E, F, O, N = lfs_world(); w.start()
+    start(L, 1, 0, 0)
+    for x in (B, G):
+        w.run(1)
+        check('oferta', offer(x))
+        no(x)
+    w.run(1)
+    check('sin más candidatos: acaba', L.ret('SG.LFS:Run() == nil'))
+    check('avisa', any('No queda' in p for p in L.prints), L.prints[-2:])
+
+    print(' dos líderes buscan a la vez: una sola ventana')
+    w, L, B, M, G, C, E, F, O, N = lfs_world(); w.start()
+    start(L, 1, 0, 0)
+    w.run(1)
+    start(E, 1, 0, 0, 'vc')
+    w.run(1)
+    check('Tanque no recibe dos a la vez', offer(B))
+    check('E pasó a otro', offer(G), E.prints[-2:])
+    no_errors(w, 'dos líderes')
+
+    print(' el alter no llega a tiempo: se reabre la plaza')
+    w, L, B, M, G, C, E, F, O, N = lfs_world(); w.start()
+    L.ev('SG:Cfg().lfsRelogTime = 1')
+    start(L, 0, 1, 0)
+    w.run(1)
+    check('oferta al druida', offer(G), L.prints[-2:])
+    pick(G, 'H'); yes(G)
+    w.run(2)
+    check('plaza reservada', L.ret('SG.LFS:Run().need.H') == 0)
+    w.run(62)
+    check('avisa y sigue buscando', any('a tiempo' in p for p in L.prints), L.prints[-2:])
+    check('oferta a otro sanador', offer(C))
+    no_errors(w, 'LFS alter tarde')
+
+# ------------------------------------------------------------------ UI
+def t_ui():
+    print('\n== Interfaz ==')
+    w = World(True)
+    a = w.add('a', {'Ana Uno': {'class': 'WARRIOR', 'level': 30, 'done': ['vc', 'dalaran']}}, 'Ana Uno')
+    b = w.add('b', {'Beto Dos': {'class': 'MAGE', 'level': 30, 'gm': True}}, 'Beto Dos')
+    w.start()
+    a.rt.execute('''
+        local o = SG.UILFS.BuildPanel
+        SG.UILFS.BuildPanel = function(s, p) __panel = o(s, p); __pve = p; return __panel end
+    ''')
+    a.ev('SG.UI:Show("profile")')
+    for tab in ('pvp', 'dungeons', 'cositas', 'events', 'admin', 'profile'):
+        a.ev('SG.UI:Show(%r)' % tab)
+    check('todas las pestañas sin error', not a.errors and not [p for p in a.prints if 'error:' in p], (a.errors[:2], a.prints[-2:]))
+    a.ev('SG.UI:Show("dungeons")')
+    check('modos Total, Semanal, LFS', a.ret('#__pve.modeButtons') == 3)
+    a.ev('__pve:Refresh()')
+    check('panel LFS oculto en Total', a.ret('__panel:IsShown()') is False)
+    check('lista visible en Total', a.ret('__pve.list:IsShown()') is True)
+    a.ev('__pve.modeButtons[3]:Click()')
+    check('al pulsar LFS se ve', a.ret('__panel:IsShown()') is True)
+    check('la lista se oculta', a.ret('__pve.list:IsShown()') is False)
+    w.run(0.2)
+    n = a.ret('#__panel.cards')
+    check('todas las mazmorras', n == a.ret('#SG.Dungeons') and n == 35, n)
+    cards = [(a.ret('__panel.cards[%d].name:GetText()' % i), a.ret('__panel.cards[%d]:IsEnabled()' % i),
+              a.ret('__panel.cards[%d].tick:IsShown()' % i), a.ret('__panel.cards[%d]._point[3]' % i)) for i in range(1, n + 1)]
+    firstopen = next(i for i, c in enumerate(cards) if c[1])
+    print('   primera disponible:', cards[firstopen][0], 'y', cards[firstopen][3])
+    mins = [a.ret('SG.Dungeons[%d].min' % i) for i in range(1, n + 1)]
+    check('primera disponible es la más alta a nivel 30 (mínimo 29)', cards[firstopen][0] in ('Gnomeregan','Horado Rajacieno'), cards[firstopen][0])
+    vs = a.ret('__panel.scroll:GetVerticalScroll()')
+    check('scroll = fila de la primera', abs(vs + a.ret('__panel.cards[%d]._point[3]' % (firstopen + 1))) < 1, (vs, a.ret('__panel.cards[%d]._point[3]' % (firstopen + 1))))
+    check('primera en columna izquierda', a.ret('__panel.cards[%d]._point[2]' % (firstopen + 1)) == 0, a.ret('__panel.cards[%d]._point[2]' % (firstopen + 1)))
+    check('las de más nivel, bloqueadas', not any(c[1] for c in cards[:firstopen]))
+    check('las siguientes, abiertas', all(c[1] for c in cards[firstopen:]))
+    tick = {c[0]: c[2] for c in cards}
+    check('tick en la hecha', tick['Las Minas de la Muerte'] and tick['Ciudad de Dalaran'])
+    check('sin tick en la no hecha', not tick['Sima Ígnea'])
+    print(' abrir la ventana de búsqueda desde la tarjeta')
+    a.ev('__panel.cards[%d]:Click()' % (firstopen + 1))
+    check('ventana abierta', a.shown('SolfaGuildLFSSearch'))
+    check('título', a.ret('SolfaGuildLFSSearch.title:GetText()') == 'Looking for Solfamidas')
+    a.ev('SolfaGuildLFSSearch.go:Click()')
+    check('sin elegir nada avisa', 'Elige' in (a.ret('SolfaGuildLFSSearch.why:GetText()') or ''), a.ret('SolfaGuildLFSSearch.why:GetText()'))
+    a.ev('SolfaGuildLFSSearch.D:SetChecked(true); SolfaGuildLFSSearch.dNum:SetText("1")')
+    a.ev('SolfaGuildLFSSearch.go:Click()')
+    w.run(1)
+    check('empieza la búsqueda', a.ret('SG.LFS:Run() ~= nil'), a.ret('SolfaGuildLFSSearch.why:GetText()'))
+    check('muestra el estado', a.ret('SolfaGuildLFSSearch.status:IsShown()') and not a.ret('SolfaGuildLFSSearch.form:IsShown()'))
+    check('oferta a Beto', offer(b))
+    a.ev('SolfaGuildLFSSearch.go:Click()')
+    w.run(1)
+    check('cancelar', a.ret('SG.LFS:Run() == nil'))
+    print(' prueba /sg lfs')
+    a.ev('SlashCmdList["SOLFAGUILD"]("lfs")')
+    check('oferta de prueba visible', offer(a))
+    check('tres funciones', len(radios(a)) == 3)
+    check('sin marcar, apagado', a.ret('SolfaGuildLFSOffer.yes:IsEnabled()') is False)
+    no(a)
+    w.run(1)
+    print(' GM y escalafón PvE')
+    check('Beto es GM en su cliente', b.ret('SG:IsAdmin()') is True, b.ret('SG.gmName'))
+    check('Ana reconoce al GM', a.ret('SG.gmName') == 'Beto Dos', a.ret('SG.gmName'))
+    check('Ana no es admin', a.ret('SG:IsAdmin()') is False)
+    r = a.ret('SG.DungeonTracker:LadderRankOf(SG:MyAccount())')
+    check('Ana tiene rango PvE', r == 'Leyenda de las Profundidades' or r is not None, r)
+    no_errors(w, 'interfaz')
+
+def t_dungeons():
+    print('\n== Mazmorra completada en Forever ==')
+    w, a, b, c = base(); w.start()
+    a.g.INST, a.g.INST_KIND = True, 'party'
+    a.fire('PLAYER_ENTERING_WORLD')
+    guid = 'Creature-0-1-1-1-639-1'
+    a.fire('UNIT_DIED', guid)
+    a.fire('PARTY_KILL', 'x', guid)
+    w.run(1)
+    check('una sola vez', a.ret('SG:MyChar().dungeons.vc') == 1, a.ret('SG:MyChar().dungeons.vc'))
+    a.fire('UNIT_DIED', 'Creature-0-1-1-1-999-1')
+    w.run(1)
+    check('otro bicho no cuenta', a.ret('SG:MyChar().dungeonsWeek') == 1)
+    no_errors(w, 'mazmorra')
+
+TESTS = [lambda: t_names(0), lambda: t_names(1), lambda: t_names(2), t_migration, t_pvp, t_classic, t_sos,
+         lambda: t_lfs(0), lambda: t_lfs(1), lambda: t_lfs(2), t_lfs_edges, t_ui, t_dungeons]
+
+for strict in ('', '1'):
+    os.environ['STRICT'] = strict
+    print('\n########## %s ##########' % ('Sin las funciones antiguas' if strict else 'Con todas las funciones'))
+    for fn in TESTS:
+        try:
+            fn()
+        except Exception:
+            fails.append('EXCEPCIÓN')
+            traceback.print_exc(limit=4)
+
+print('\n%d correctas, %d fallos' % (passes, len(fails)))
+for f in fails:
+    print(' -', f)
+sys.exit(1 if fails else 0)

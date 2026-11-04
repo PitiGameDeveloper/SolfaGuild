@@ -16,6 +16,13 @@ SG.COLOR   = "|cffb48cff"
 
 SG.modules = {}
 
+-- Forever y Midnight prohíben a los addons el registro de combate: registrar
+-- COMBAT_LOG_EVENT_UNFILTERED saca un aviso de "bloqueado" al jugador.
+local INTERFACE = select(4, GetBuildInfo())
+SG.HasCombatLog = not (INTERFACE >= 120000 or (INTERFACE >= 16000 and INTERFACE < 20000))
+-- En Forever los personajes tienen nombre y apellido
+SG.IsForever = INTERFACE >= 16000 and INTERFACE < 20000
+
 ---------------------------------------------------------------------------
 -- Errores: se avisan en el chat (una vez por sesión) y se guardan en
 -- SolfaGuildDB.errors para poder revisarlos fuera del juego.
@@ -50,6 +57,7 @@ SG.frame = frame
 local handlers = {}
 
 function SG:On(event, fn)
+    if event == "COMBAT_LOG_EVENT_UNFILTERED" and not self.HasCombatLog then return end
     if not handlers[event] then
         handlers[event] = {}
         frame:RegisterEvent(event)
@@ -104,15 +112,56 @@ function SG:Now()
     return GetServerTime and GetServerTime() or time()
 end
 
--- Nombre corto sin reino
+-- Nombre de un personaje sin reino: es la clave con la que se guarda todo.
+-- Forever: "Nombre Apellido". Según de dónde venga llega como "Nombre Apellido-Reino",
+-- "Nombre-Apellido" o "Nombre-Apellido-Reino". Classic Era: "Nombre" o "Nombre-Reino".
 function SG:Short(name)
     if not name then return nil end
     if Ambiguate then name = Ambiguate(name, "none") end
-    return (strsplit("-", name))
+    local first, second = strsplit("-", name)
+    if self.IsForever and second and second ~= "" and not first:find(" ", 1, true) then
+        return first .. " " .. second
+    end
+    return first
+end
+
+-- Valor que el juego puede ocultar en Forever (con esos no se puede operar): nil
+function SG:Open(v)
+    if v ~= nil and issecretvalue and issecretvalue(v) then return nil end
+    return v
+end
+
+-- Nombre de una unidad, igual que SG:Short. nil si no existe o el juego lo oculta.
+function SG:UnitFull(unit)
+    local a, b = UnitName(unit)
+    a, b = self:Open(a), self:Open(b)
+    if not a or a == "" then return nil end
+    -- la segunda parte es el apellido en Forever y el reino en Classic Era
+    if self.IsForever and b and b ~= "" then return a .. " " .. b end
+    return a
 end
 
 function SG:MyName()
-    return (UnitName("player"))
+    return self:UnitFull("player") or (UnitName("player"))
+end
+
+-- Forma de escribir un nombre que el juego acepta para susurrar o invitar: la que
+-- él mismo nos ha dado. Primero la del último mensaje recibido, luego la del roster.
+SG.rawNames = {}
+function SG:Target(name)
+    local r = self.roster and self.roster[name]
+    return self.rawNames[name] or (r and r.full) or name
+end
+
+-- ¿Va en mi grupo? Por nombre UnitInParty no siempre vale con apellidos: se mira uno a uno.
+function SG:InMyGroup(name)
+    if not IsInGroup() then return false end
+    local raid = IsInRaid()
+    for i = 1, GetNumGroupMembers() do
+        local unit = raid and ("raid" .. i) or ("party" .. i)
+        if UnitExists(unit) and self:UnitFull(unit) == name then return true end
+    end
+    return false
 end
 
 function SG:GuildName()
@@ -249,7 +298,6 @@ local DB_DEFAULTS = {
         main = nil,         -- nombre del main elegido
         chars = {},         -- [nombre] = datos completos del personaje
         milestones = {},    -- [clave] = timestamp (hitos ya celebrados, por jugador)
-        dhNotified = {},    -- [char..dungeon] = true
         isGMAccount = {},   -- [guild] = true si esta cuenta tiene al GM
     },
     guilds = {},            -- [guild] = { accounts, seen, settings, events, gmAccount }
@@ -263,6 +311,7 @@ function SG:InitDB()
     SolfaGuildDB = SolfaGuildDB or {}
     self:CopyDefaults(SolfaGuildDB, DB_DEFAULTS)
     self.db = SolfaGuildDB
+    self.db.my.dhNotified = nil   -- de versiones anteriores (ayudante de mazmorras)
     for _, e in ipairs(pendingErrors) do table.insert(self.db.errors, e) end
     wipe(pendingErrors)
     if not self.db.accountId then
@@ -325,6 +374,13 @@ SG:On("ADDON_LOADED", function(name)
 end)
 
 SG:On("PLAYER_LOGIN", function()
+    -- de versiones anteriores, que en Forever guardaban solo el nombre sin apellido
+    local first, full = (UnitName("player")), SG:MyName()
+    local chars = SG.db.my.chars
+    if first ~= full and chars[first] and not chars[full] then
+        chars[full], chars[first] = chars[first], nil
+        if SG.db.my.main == first then SG.db.my.main = full end
+    end
     local c = SG:MyChar()
     c.class = select(2, UnitClass("player"))
     c.level = UnitLevel("player")
@@ -367,6 +423,8 @@ local function slash(msg)
         SG:Fire("TEST_POPUP")
     elseif msg == "campeo" then
         SG:Fire("TEST_CAMP")
+    elseif msg == "lfs" then
+        SG:Fire("TEST_LFS")
     else
         if SG.UI and SG.UI.Toggle then SG.UI:Toggle() end
     end

@@ -129,13 +129,10 @@ local function askForHelp(enemy, count, test)
     })
 end
 
-local function onDeath()
-    if not SG:Feature("campSOS") or not inOpenWorld() then return end
+local function onKilledByPlayer(killer)
     local now = GetTime()
-    if not lastHit or now - lastHit.t > KILL_WINDOW then return end
     local need, window = cfg()
-    table.insert(deaths, { name = lastHit.name, t = now })
-    lastHit = nil
+    table.insert(deaths, { name = killer, t = now })
     -- solo cuentan las muertes dentro de la ventana de tiempo
     for i = #deaths, 1, -1 do
         if now - deaths[i].t > window then table.remove(deaths, i) end
@@ -153,6 +150,7 @@ local function onDeath()
     askForHelp(enemy, count)
 end
 
+-- Classic Era: el último jugador enemigo que te dañó, por el registro de combate
 SG:On("COMBAT_LOG_EVENT_UNFILTERED", function()
     local _, sub, _, _, srcName, srcFlags, _, destGUID = CombatLogGetCurrentEventInfo()
     if not srcName or destGUID ~= UnitGUID("player") then return end
@@ -161,7 +159,47 @@ SG:On("COMBAT_LOG_EVENT_UNFILTERED", function()
     end
 end)
 
-SG:On("PLAYER_DEAD", onDeath)
+-- Forever: lo dice el resumen de muerte del juego. La entrada más reciente es el
+-- golpe final. Devuelve el nombre si fue un jugador; si no, nil.
+local function killerFromRecap()
+    local DR = C_DeathRecap
+    if not (DR and DR.HasRecapEvents and SG:Open(DR.HasRecapEvents())) then return end
+    local list = DR.GetRecapEvents()
+    if type(list) ~= "table" then return end
+    local best, bestT
+    for _, ev in ipairs(list) do
+        local t = SG:Open(ev.timestamp) or 0
+        if not best or t >= bestT then best, bestT = ev, t end
+    end
+    if not best then return end
+    local guid = SG:Open(best.sourceGUID)
+    if type(guid) ~= "string" or not guid:find("^Player%-") or guid == SG:Open(UnitGUID("player")) then return end
+    local name = SG:Open(best.sourceName)
+    if type(name) == "string" and name ~= "" then return SG:Short(name) end
+    return "?"
+end
+
+local lastDeathAt = 0   -- el juego repite PLAYER_DEAD al liberar el espíritu
+SG:On("PLAYER_DEAD", function()
+    if not SG:Feature("campSOS") or not inOpenWorld() then return end
+    if SG.HasCombatLog then
+        if lastHit and GetTime() - lastHit.t <= KILL_WINDOW then
+            local name = lastHit.name
+            lastHit = nil
+            onKilledByPlayer(name)
+        end
+        return
+    end
+    local now = GetTime()
+    if now - lastDeathAt < 30 then return end
+    lastDeathAt = now
+    C_Timer.After(1, function()
+        SG:Try(function()
+            local killer = killerFromRecap()
+            if killer then onKilledByPlayer(killer) end
+        end)
+    end)
+end)
 
 ---------------------------------------------------------------------------
 -- Utilidades de grupo (API nueva si existe, si no la antigua)
@@ -171,6 +209,7 @@ local function leaveGroup()
 end
 
 local function invite(name)
+    name = SG:Target(name)
     if C_PartyInfo and C_PartyInfo.InviteUnit then C_PartyInfo.InviteUnit(name) else InviteUnit(name) end
 end
 
@@ -178,9 +217,7 @@ local function convertToRaid()
     if C_PartyInfo and C_PartyInfo.ConvertToRaid then C_PartyInfo.ConvertToRaid() else ConvertToRaid() end
 end
 
-local function inGroupWith(name)
-    return UnitInParty(name) or UnitInRaid(name)
-end
+local function inGroupWith(name) return SG:InMyGroup(name) end
 
 ---------------------------------------------------------------------------
 -- 2) Pedir refuerzos: preparar la banda y avisar a la guild
@@ -259,7 +296,7 @@ SG:On("PARTY_INVITE_REQUEST", function(inviter)
     if SG:Short(inviter) ~= answering.from then return end
     answering = nil
     AcceptGroup()
-    C_Timer.After(0.1, function() StaticPopup_Hide("PARTY_INVITE") end)
+    C_Timer.After(0.1, function() if StaticPopup_Hide then StaticPopup_Hide("PARTY_INVITE") end end)
 end)
 
 ---------------------------------------------------------------------------

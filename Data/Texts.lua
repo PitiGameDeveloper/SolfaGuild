@@ -57,6 +57,17 @@ T.pvpLadder = {
 }
 
 ---------------------------------------------------------------------------
+-- ESCALAFÓN PVE de la pestaña PvE: igual que el de PvP, por mazmorras completadas.
+---------------------------------------------------------------------------
+T.pveLadder = {
+    { name = "Leyenda de las Profundidades", players = 1 },
+    { name = "Señores de las Criptas",       players = 3 },
+    { name = "Rompemazmorras",               players = 5 },
+    { name = "Veteranos",                    players = 10 },
+    { name = "Exploradores" },
+}
+
+---------------------------------------------------------------------------
 -- ORO: total recolectado en la vida de la cuenta
 ---------------------------------------------------------------------------
 T.goldEarned = {
@@ -128,8 +139,20 @@ T.ui = {
     zoneTitle = "Solfamidas en %zone%",
     zoneText = "Hay compañeros de la guild en tu zona. Marca a quién quieres avisar por susurro:",
     zoneWhisper = "¡Ey! Estoy por %zone%, ¿hacemos grupillo? [SolfaGuild]",
-    dhTitle = "¡Ya puedes hacer %dungeon%!",
-    dhWhisper = "¡Ey! Voy a hacer %dungeon%, estás en nivel para venir, ¿te apuntas? [SolfaGuild]",
+    -- LFS (%dungeon% = mazmorra, %char% = personaje con color y nivel, %who% = quien busca)
+    lfsTitle = "Looking for Solfamidas",
+    lfsRoleT = "Tanque",
+    lfsRoleH = "Sanador",
+    lfsRoleD = "DPS",
+    lfsOffer = "Los solfamidas se van de expedición a %dungeon%, necesitan apoyo. Tu personaje %char% les iría perfecto, ¿quieres unirte?",
+    lfsLeave = "|cffffd200(si aceptas se te echará del grupo en el que estés)|r",
+    lfsOtherChar = "|cffffd200(si aceptas tendrás que entrar con %char%; al hacerlo se te echará del grupo en el que estés)|r",
+    lfsYes = "Aceptar",
+    lfsNo = "Rechazar",
+    lfsGoing = "Vas con %who% a %dungeon%. Aceptarás su invitación automáticamente.",
+    lfsRelog = "Entra con %char% en menos de %min% min: en cuanto llegues, %who% te invitará.",
+    lfsTaken = "Esa plaza ya está cubierta. ¡Gracias de todos modos!",
+    lfsCancelled = "La búsqueda del grupo se ha cancelado.",
     eventSoon = "El evento '%title%' empieza en %min% minutos.",
     eventNow = "¡El evento '%title%' empieza AHORA!",
     -- SOS por campeo (%killer% = quien te mata, %who% = jugador, %zone% = zona)

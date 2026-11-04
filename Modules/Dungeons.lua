@@ -30,23 +30,35 @@ function D:Complete(d)
     SG.Milestones:Check("dung", SG.Texts.dungeonRanks, total, "HITO DE MAZMORRAS", { dungeon = d.name })
 end
 
--- El registro de combate solo se escucha dentro de mazmorras y bandas (fuera no
--- hay jefes que contar), y lo único que se mira es si alguien ha muerto.
-local cl = CreateFrame("Frame")
-cl:SetScript("OnEvent", function()
-    local _, sub, _, _, _, _, _, destGUID = CombatLogGetCurrentEventInfo()
-    if sub ~= "UNIT_DIED" then return end
-    local id = npcId(destGUID)
+local function onDeath(guid)
+    -- en Forever algunos valores pueden venir ocultos: con esos no se puede operar
+    if not guid or (issecretvalue and issecretvalue(guid)) then return end
+    local id = npcId(guid)
     local d = id and SG.DungeonByBoss[id]
     if d then SG:Try(D.Complete, D, d) end
+end
+
+-- Solo se escucha dentro de mazmorras y bandas (fuera no hay jefes que contar), y
+-- lo único que se mira es si alguien ha muerto. En Forever no hay registro de
+-- combate: están los eventos UNIT_DIED y PARTY_KILL. Complete() ya evita contar dos veces.
+local DEATH_EVENTS = SG.HasCombatLog and { "COMBAT_LOG_EVENT_UNFILTERED" } or { "UNIT_DIED", "PARTY_KILL" }
+local cl = CreateFrame("Frame")
+cl:SetScript("OnEvent", function(_, event, a, b)
+    if event == "COMBAT_LOG_EVENT_UNFILTERED" then
+        local _, sub, _, _, _, _, _, destGUID = CombatLogGetCurrentEventInfo()
+        if sub == "UNIT_DIED" then onDeath(destGUID) end
+    elseif event == "UNIT_DIED" then
+        onDeath(a)
+    else
+        onDeath(b)
+    end
 end)
 
 local function updateListening()
     local inInstance, kind = IsInInstance()
-    if inInstance and (kind == "party" or kind == "raid") then
-        cl:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-    else
-        cl:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    local inside = inInstance and (kind == "party" or kind == "raid")
+    for _, event in ipairs(DEATH_EVENTS) do
+        if inside then cl:RegisterEvent(event) else cl:UnregisterEvent(event) end
     end
 end
 SG:On("PLAYER_ENTERING_WORLD", updateListening)
@@ -59,4 +71,14 @@ function D:CharDone(charName, dungeonId)
     local c = acc.chars[charName]
     if not c then return nil end
     return (c.dungeons and c.dungeons[dungeonId] or 0) > 0
+end
+
+-- Escalafón de mazmorras, igual que el de PvP (ver Texts.pveLadder)
+function D:Ladder(week)
+    local list = SG:Ranking(function(a) return week and SG:AccountWeekDungeons(a) or SG:AccountDungeons(a) end)
+    return SG:BuildLadder(list, SG.Texts.pveLadder)
+end
+
+function D:LadderRankOf(acc, week)
+    return SG:LadderRankOf(self:Ladder(week), acc)
 end

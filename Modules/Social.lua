@@ -35,7 +35,9 @@ local function hookNames()
                 return false, SG.ICON .. " " .. msg, author, ...
             end
         end
-        ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", filter)
+        -- Forever lo tiene en ChatFrameUtil; Classic Era, con el nombre antiguo
+        local add = (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter) or ChatFrame_AddMessageEventFilter
+        if add then add("CHAT_MSG_WHISPER", filter) end
     end
 end
 
@@ -55,7 +57,7 @@ SG:On("PARTY_INVITE_REQUEST", function(inviter)
                 local t = _G["StaticPopup" .. i .. "Text"]
                 if t and t:GetText() and not t:GetText():find("clef", 1, true) then
                     t:SetText(SG.ICON .. " " .. t:GetText() .. "\n|cffb48cff(Solfamida)|r")
-                    StaticPopup_Resize(f, f.which)
+                    if StaticPopup_Resize then StaticPopup_Resize(f, f.which) end
                 end
             end
         end
@@ -72,7 +74,7 @@ function Social:MembersInZone(zone)
     local me = SG:MyName()
     for name, r in pairs(SG.roster) do
         if r.online and r.zone == zone and name ~= me
-            and not UnitInParty(name) and not UnitInRaid(name) then
+            and not SG:InMyGroup(name) then
             out[#out + 1] = { name = name, level = r.level, class = r.class, main = SG:MainOf(name) }
         end
     end
@@ -106,7 +108,7 @@ function Social:ZoneCheck(zone, force)
         button = "Susurrar",
         onAccept = function(sel)
             local msg = SG:Fmt(SG.Texts.ui.zoneWhisper, { zone = zone })
-            for _, name in ipairs(sel) do SendChatMessage(msg, "WHISPER", nil, name) end
+            for _, name in ipairs(sel) do SendChatMessage(msg, "WHISPER", nil, SG:Target(name)) end
             if #sel > 0 then SG:Print("Avisados " .. #sel .. " Solfamida(s) en " .. zone .. ".") end
         end,
     })

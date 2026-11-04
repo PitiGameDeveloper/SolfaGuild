@@ -19,10 +19,11 @@ Modules\Gold.lua
 Modules\Dungeons.lua
 Modules\Playtime.lua
 Modules\Cositas.lua
-Modules\DungeonHelper.lua
+Modules\LFS.lua
 Modules\Social.lua
 Modules\CampSOS.lua
 Modules\Events.lua
 UI\Widgets.lua
+UI\LFS.lua
 UI\MainFrame.lua
 UI\Minimap.lua

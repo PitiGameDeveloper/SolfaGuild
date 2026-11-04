@@ -26,7 +26,7 @@ jobs:
           # Copia solo lo que va dentro del juego, en una carpeta SolfaGuild/
           mkdir -p build/SolfaGuild
           git archive HEAD | tar -x -C build/SolfaGuild
-          rm -rf build/SolfaGuild/.github build/SolfaGuild/.gitignore build/SolfaGuild/CLAUDE.md
+          rm -rf build/SolfaGuild/.github build/SolfaGuild/.gitignore build/SolfaGuild/CLAUDE.md build/SolfaGuild/tests
           sed -i "s/^## Version:.*/## Version: ${VERSION}/" build/SolfaGuild/SolfaGuild.toc
           (cd build && zip -r -9 "../${ZIP}" SolfaGuild)
 

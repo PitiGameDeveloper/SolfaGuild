@@ -46,21 +46,6 @@ local function charDungeons(c)
     return total
 end
 
--- Cada jugador sale solo con su main, que engloba las estadísticas de todos sus personajes
-local function rankingRows(list, formatter)
-    local rows = {}
-    for i, it in ipairs(list) do
-        local medal = (i == 1 and "|cffffd700") or (i == 2 and "|cffc0c0c0") or (i == 3 and "|cffcd7f32") or "|cffaaaaaa"
-        rows[#rows + 1] = {
-            text = medal .. i .. ".|r  " .. SG:ColoredMain(it.acc)
-                .. (it.acc.mine and " |cff88ff88(tú)|r" or ""),
-            right = formatter(it.value),
-        }
-    end
-    if #rows == 0 then rows[1] = { text = "|cff888888Aún no hay datos. ¡Sal ahí fuera!|r" } end
-    return rows
-end
-
 ---------------------------------------------------------------------------
 -- Panel genérico de ranking con modos
 ---------------------------------------------------------------------------
@@ -74,6 +59,14 @@ local function makeRankingPanel(parent, modes)
     local left = -(#modes * BW + (#modes - 1) * GAP) / 2
     for i, m in ipairs(modes) do
         local b = W:Button(p, m.text, BW, 22, function() p.mode = i; p:Refresh() end)
+        -- una opción puede traer su propio panel en vez de filas
+        if m.build then
+            m.panel = m.build(p)
+            m.panel:ClearAllPoints()
+            m.panel:SetPoint("TOPLEFT", 8, -32)
+            m.panel:SetPoint("BOTTOMRIGHT", -28, 8)
+            m.panel:Hide()
+        end
         b:SetPoint("TOPLEFT", p, "TOP", left + (i - 1) * (BW + GAP), -4)
         p.modeButtons[i] = b
     end
@@ -84,7 +77,12 @@ local function makeRankingPanel(parent, modes)
         for i, b in ipairs(self.modeButtons) do
             if i == self.mode then b:LockHighlight() else b:UnlockHighlight() end
         end
-        self.list:SetRows(modes[self.mode].rows())
+        local m = modes[self.mode]
+        for _, o in ipairs(modes) do
+            if o.panel then o.panel:SetShown(o == m) end
+        end
+        self.list:SetShown(m.rows ~= nil)
+        if m.panel then m.panel:Refresh() else self.list:SetRows(m.rows()) end
     end
     return p
 end
@@ -123,11 +121,10 @@ local function buildProfile(parent)
 
     function p:Refresh()
         local t = SG.Milestones:MyTotals()
-        local M, T = SG.Milestones, SG.Texts
         pvp.rank:SetText(SG.PvP:LadderRankOf(t.acc) or "Sin rango")
         pvp.total:SetText(t.kills .. " asesinatos")
         pvp.week:SetText(t.killsWeek .. " esta semana")
-        pve.rank:SetText(M:RankName(T.dungeonRanks, t.dungeons))
+        pve.rank:SetText(SG.DungeonTracker:LadderRankOf(t.acc) or "Sin rango")
         pve.total:SetText(t.dungeons .. " dungeons")
         pve.week:SetText(t.dungeonsWeek .. " esta semana")
 
@@ -228,32 +225,28 @@ local function buildPvP(parent)
     })
 end
 
+-- Escalafón de mazmorras, igual que el de PvP
+local function pveRows(week)
+    local rows = { { text = "Ranking de mazmorras", header = true } }
+    local ladder, nobody = SG.DungeonTracker:Ladder(week)
+    for _, tier in ipairs(ladder) do
+        rows[#rows + 1] = { text = "|cffffd100" .. tier.name .. "|r" }
+        for _, it in ipairs(tier.members) do
+            rows[#rows + 1] = { text = INDENT .. SG:ColoredMain(it.acc) .. you(it.acc), right = num(it.value) .. " " .. DRAGON }
+        end
+    end
+    if nobody then   -- tú, aún sin mazmorras
+        rows[#rows + 1] = { text = "|cff888888Sin mazmorras|r" }
+        rows[#rows + 1] = { text = INDENT .. SG:ColoredMain(nobody.acc) .. you(nobody.acc), right = num(0) .. " " .. DRAGON }
+    end
+    return rows
+end
+
 local function buildDungeons(parent)
     return makeRankingPanel(parent, {
-        { text = "Ranking", rows = function()
-            local rows = { { text = "Mazmorras completadas", header = true } }
-            for _, r in ipairs(rankingRows(SG:Ranking(function(a) return SG:AccountDungeons(a) end),
-                function(v) return num(v) .. "  |cffb48cff" .. SG.Milestones:RankName(SG.Texts.dungeonRanks, v) .. "|r" end)) do rows[#rows + 1] = r end
-            return rows
-        end },
-        { text = "Para mi nivel", rows = function()
-            local lvl = UnitLevel("player")
-            local rows = { { text = "Mazmorras para nivel " .. lvl, header = true } }
-            local list = SG.DungeonHelper:ForLevel(lvl)
-            if #list == 0 then rows[#rows + 1] = { text = "|cff888888Ninguna en rango ahora mismo.|r" } end
-            for _, d in ipairs(list) do
-                local done = SG.DungeonTracker:CharDone(SG:MyName(), d.id)
-                local cands = SG.DungeonHelper:Candidates(d)
-                local online = 0
-                for _, c in ipairs(cands) do if c.online then online = online + 1 end end
-                rows[#rows + 1] = {
-                    text = d.name .. " |cff999999(" .. d.min .. "-" .. d.max .. ")|r" .. (done and " " .. CHECK or ""),
-                    right = online .. " compis online",
-                    button = { text = "Buscar grupo", width = 100, onClick = function() SG.DungeonHelper:Announce(d) end },
-                }
-            end
-            return rows
-        end },
+        { text = "Total", rows = function() return pveRows(false) end },
+        { text = "Semanal", rows = function() return pveRows(true) end },
+        { text = "LFS", build = function(p) return SG.UILFS:BuildPanel(p) end },
     })
 end
 
@@ -426,7 +419,7 @@ end
 ---------------------------------------------------------------------------
 local FEATURE_NAMES = {
     { "pvp", "Rangos PvP" }, { "gold", "Hitos de oro" },
-    { "dungeons", "Hitos de mazmorras" }, { "dungeonHelper", "Ayudante de mazmorras" },
+    { "dungeons", "Hitos de mazmorras" }, { "lfs", "LFS" },
     { "cositas", "Cositas" },
     { "whisperIcon", "Nota musical en susurros" }, { "inviteIcon", "Aviso de invitaciones" },
     { "zoneNotify", "Aviso de zona" }, { "events", "Eventos" }, { "campSOS", "SOS por campeo" },
@@ -464,9 +457,8 @@ local function buildAdmin(parent)
     p.zoneCd = numField("Aviso de zona cada (min):", 10)
     p.reminder = numField("Aviso de evento antes (min):", 320)
     y = y - 24
-    p.dhBelow = numField("Mazmorras: niveles por debajo:", 10)
-    p.dhAbove = numField("Niveles por encima:", 250)
-    p.dhMax = numField("Desactivar a partir de nivel:", 420)
+    p.lfsOffer = numField("LFS: segundos para contestar:", 10)
+    p.lfsRelog = numField("LFS: min para cambiar de personaje:", 320)
     y = y - 24
     p.campDeaths = numField("Campeo: muertes seguidas:", 10)
     p.campWindow = numField("en (min):", 250)
@@ -500,9 +492,8 @@ local function buildAdmin(parent)
         for _, cb in ipairs(self.features) do cfg.features[cb.key] = cb:GetChecked() and true or false end
         cfg.zoneCooldown = tonumber(self.zoneCd:GetText()) or cfg.zoneCooldown
         cfg.eventReminder = tonumber(self.reminder:GetText()) or cfg.eventReminder
-        cfg.dhBelow = tonumber(self.dhBelow:GetText()) or cfg.dhBelow
-        cfg.dhAbove = tonumber(self.dhAbove:GetText()) or cfg.dhAbove
-        cfg.dhMaxLevel = tonumber(self.dhMax:GetText()) or cfg.dhMaxLevel
+        cfg.lfsOfferTime = tonumber(self.lfsOffer:GetText()) or cfg.lfsOfferTime
+        cfg.lfsRelogTime = tonumber(self.lfsRelog:GetText()) or cfg.lfsRelogTime
         cfg.campDeaths = tonumber(self.campDeaths:GetText()) or cfg.campDeaths
         cfg.campWindow = tonumber(self.campWindow:GetText()) or cfg.campWindow
         cfg.eventRanks = {}
@@ -520,7 +511,7 @@ local function buildAdmin(parent)
         local cfg = SG:Cfg()
         for _, cb in ipairs(self.features) do cb:SetChecked(cfg.features[cb.key] ~= false) end
         self.zoneCd:SetText(cfg.zoneCooldown); self.reminder:SetText(cfg.eventReminder)
-        self.dhBelow:SetText(cfg.dhBelow); self.dhAbove:SetText(cfg.dhAbove); self.dhMax:SetText(cfg.dhMaxLevel)
+        self.lfsOffer:SetText(cfg.lfsOfferTime); self.lfsRelog:SetText(cfg.lfsRelogTime)
         self.campDeaths:SetText(cfg.campDeaths); self.campWindow:SetText(cfg.campWindow)
         local nr = GuildControlGetNumRanks and GuildControlGetNumRanks() or 0
         for i, cb in ipairs(self.rankChecks) do
@@ -554,7 +545,7 @@ local function buildAdmin(parent)
                 text = SG:ClassColor(m.r.class) .. m.name .. "|r (" .. m.r.level .. ") |cff999999" .. (m.r.rank or "") .. "|r",
                 right = m.r.online and "|cff55ff55online|r" or "|cff666666offline|r",
                 button = m.r.online and { text = "Avisar", width = 60, onClick = function()
-                    SendChatMessage("¡Instálate el addon SolfaGuild para los rankings y eventos de la guild! ~SG~", "WHISPER", nil, m.name)
+                    SendChatMessage("¡Instálate el addon SolfaGuild para los rankings y eventos de la guild! ~SG~", "WHISPER", nil, SG:Target(m.name))
                 end } or nil,
             }
         end
@@ -660,6 +651,6 @@ local function schedule()
         if current ~= "admin" then UI:Refresh() end
     end)
 end
-for _, ev in ipairs({ "DATA_UPDATED", "EVENTS_UPDATED", "SETTINGS_CHANGED", "ROSTER_UPDATED", "PVP_KILL", "DUNGEON_DONE" }) do
+for _, ev in ipairs({ "DATA_UPDATED", "EVENTS_UPDATED", "SETTINGS_CHANGED", "ROSTER_UPDATED", "PVP_KILL", "DUNGEON_DONE", "LFS_CHANGED" }) do
     SG:Listen(ev, schedule)
 end

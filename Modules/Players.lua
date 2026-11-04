@@ -33,9 +33,10 @@ local function readRoster()
     for i = 1, n do
         local name, rank, rankIndex, level, _, zone, _, _, online, _, classFile = GetGuildRosterInfo(i)
         if name then
+            local full = name
             name = SG:Short(name)
             roster[name] = {
-                rank = rank, rankIndex = rankIndex, level = level,
+                full = full, rank = rank, rankIndex = rankIndex, level = level,
                 class = classFile, zone = zone, online = online and true or false,
             }
             if rankIndex == 0 then SG.gmName = name end
@@ -252,6 +253,35 @@ function SG:Ranking(valueFn)
     end
     table.sort(out, function(a, b) return a.value > b.value end)
     return out
+end
+
+-- Escalafón: los jugadores (ya ordenados, de SG:Ranking) llenan los rangos en
+-- orden. Devuelve { { name, members = { {acc, value} } } } solo con rangos
+-- ocupados, y aparte tu cuenta si aún está a cero.
+function SG:BuildLadder(list, tiers)
+    local out, idx = {}, 1
+    for _, tier in ipairs(tiers) do
+        local members = {}
+        while list[idx] and list[idx].value > 0 and (not tier.players or #members < tier.players) do
+            members[#members + 1] = list[idx]
+            idx = idx + 1
+        end
+        if #members > 0 then out[#out + 1] = { name = self:Fmt(tier.name), members = members } end
+    end
+    local nobody
+    for i = idx, #list do
+        if list[i].acc.mine then nobody = list[i] end
+    end
+    return out, nobody
+end
+
+-- Rango de una cuenta en un escalafón (nil = está a cero)
+function SG:LadderRankOf(ladder, acc)
+    for _, tier in ipairs(ladder) do
+        for _, it in ipairs(tier.members) do
+            if it.acc.id == acc.id then return tier.name end
+        end
+    end
 end
 
 ---------------------------------------------------------------------------
