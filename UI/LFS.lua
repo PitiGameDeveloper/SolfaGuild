@@ -240,21 +240,17 @@ local function buildSearch()
     f.T = buildRole(f, "T", -100)
     f.H = buildRole(f, "H", 0)
     f.D = buildRole(f, "D", 100)
-    for _, role in ipairs({ "T", "H" }) do
-        f[role]:SetScript("OnClick", function()
-            f.need[role] = 1 - f.need[role]
+    -- clic izquierdo añade, clic derecho quita
+    local ROLE_MAX = { T = 1, H = 1, D = MAX_DPS }
+    for role, max in pairs(ROLE_MAX) do
+        f[role]:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        f[role]:SetScript("OnClick", function(_, button)
+            local n = f.need[role] + (button == "LeftButton" and 1 or -1)
+            f.need[role] = math.max(0, math.min(max, n))
             f.why:SetText("")
             updateForm(f)
         end)
     end
-    -- DPS: clic derecho resta, clic izquierdo suma
-    f.D:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    f.D:SetScript("OnClick", function(_, button)
-        local n = f.need.D + (button == "LeftButton" and 1 or -1)
-        f.need.D = math.max(0, math.min(MAX_DPS, n))
-        f.why:SetText("")
-        updateForm(f)
-    end)
     f.D.count = W:BigLabel(f.D, 24)
     f.D.count:SetPoint("BOTTOMRIGHT", 2, -2)
     f.hint = W:Label(f.form, SG.Texts.ui.lfsDpsHint, "GameFontHighlightSmall")

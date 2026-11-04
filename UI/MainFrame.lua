@@ -625,7 +625,7 @@ local function build()
     -- Solfers conectados, a la izquierda del botón de cerrar
     frame.online = CreateFrame("Frame", nil, frame)
     frame.online:SetSize(60, 20)
-    frame.online:SetPoint("TOPRIGHT", -103, -2)
+    frame.online:SetPoint("TOPRIGHT", -78, -2)
     frame.online:EnableMouse(true)
     frame.online:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
