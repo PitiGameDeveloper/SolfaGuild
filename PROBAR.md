@@ -55,7 +55,7 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] La búsqueda llega a quien toca, en el orden correcto, y nunca a quien no llega al nivel.
 - [ ] Quien acepta sale de su grupo y entra **sin pulsar nada más**.
 - [ ] Oferta con un alter: al entrar con él dentro de los 5 min, le invitan solo.
-- [ ] Faltando solo DPS salen dos ofertas a la vez.
+- [ ] Buscando solo 2 DPS, con dos colegas conectados **fuera de tu grupo**, les salen las dos ofertas a la vez, también justo después de entrar (cuando más perfiles se envían). Quien ya va en tu grupo no recibe oferta.
 - [ ] Los mensajes llegan también si hay restricción de chat (`C_ChatInfo.InChatMessagingLockdown`).
 - [ ] Tamaño de grupo: se asume 5 en todas (`MAX_GROUP`). Una guía dice 10 en Cumbre de Roca Negra Superior.
 - [ ] Funciones por clase (`SG.ClassRoles`, en `Data/Dungeons.lua`): son las de Classic. Ver si alguna clase puede tanquear o curar además.

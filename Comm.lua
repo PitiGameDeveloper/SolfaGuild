@@ -84,22 +84,33 @@ local INTERVAL = 0.12
 
 local function rawSend(text, channel, target)
     if C_ChatInfo and C_ChatInfo.SendAddonMessage then
-        C_ChatInfo.SendAddonMessage(SG.PREFIX, text, channel, target)
-    else
-        SendAddonMessage(SG.PREFIX, text, channel, target)
+        return C_ChatInfo.SendAddonMessage(SG.PREFIX, text, channel, target)
     end
+    return SendAddonMessage(SG.PREFIX, text, channel, target)
 end
 
+-- El juego puede no enviarlo por exceso de mensajes y entonces se pierde: se reintenta.
+-- Forever da un código (Enum.SendAddonMessageResult: AddonMessageThrottle, ChannelThrottle
+-- y AddOnMessageLockdown) y otros clientes, true/false.
+local function mustRetry(r) return r == false or r == 3 or r == 8 or r == 11 end
+local RETRY_WAIT, MAX_TRIES = 1, 5
+
+local wait = INTERVAL
 sendFrame:SetScript("OnUpdate", function(self, elapsed)
     acc = acc + elapsed
-    if acc < INTERVAL then return end
-    acc = 0
-    local item = table.remove(queue, 1)
-    if item then
-        rawSend(item[1], item[2], item[3])
-    else
+    if acc < wait then return end
+    acc, wait = 0, INTERVAL
+    local item = queue[1]
+    if not item then
         self:Hide()
+        return
     end
+    if mustRetry(rawSend(item[1], item[2], item[3])) then
+        item.tries = (item.tries or 0) + 1
+        wait = RETRY_WAIT
+        if item.tries < MAX_TRIES then return end
+    end
+    table.remove(queue, 1)
 end)
 sendFrame:Hide()
 
@@ -113,9 +124,17 @@ function Comm:Send(msg, channel, target)
     local id = tostring(msgCounter)
     local total = math.ceil(#data / CHUNK)
     if total < 1 then total = 1 end
+    -- el LFS no espera detrás de los perfiles: una oferta sin confirmar a los 5 s se da por perdida
+    local first = type(msg.t) == "string" and msg.t:find("^LFS_") ~= nil
+    local pos = #queue + 1
+    if first then
+        pos = 1
+        while queue[pos] and queue[pos].first do pos = pos + 1 end
+    end
     for i = 1, total do
         local piece = data:sub((i - 1) * CHUNK + 1, i * CHUNK)
-        table.insert(queue, { id .. "\t" .. i .. "\t" .. total .. "\t" .. piece, channel, target })
+        table.insert(queue, pos, { id .. "\t" .. i .. "\t" .. total .. "\t" .. piece, channel, target, first = first })
+        pos = pos + 1
     end
     sendFrame:Show()
 end

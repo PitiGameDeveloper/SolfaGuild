@@ -45,6 +45,8 @@
   puede contar barato, no se hace. Los contadores que
   cambian a menudo no llaman a `SG:MarkDirty()`: el perfil se comprueba cada minuto y solo sale si ha cambiado (sin
   contar el tiempo jugado), o cada 5 min aunque no haya cambiado.
+- **Cola de mensajes (`Comm.lua`).** Si el juego limita un mensaje (`SendAddonMessage` da `AddonMessageThrottle` y similares)
+  se reintenta; los `LFS_*` van por delante de los perfiles. Un mensaje nuevo del LFS debe empezar por `LFS_`.
 - **Personajes borrados o vueltos a crear.** El juego no da la lista de personajes de la cuenta. Uno que ya no sale en la
   lista completa de la guild deja de contar, pero sus datos no se tocan (`SG:MyGuildChars`). Si entra otro con el mismo
   nombre y otro `UnitGUID` en el mismo reino, empieza de cero (`Core.lua`); con otro reino es un traslado y los conserva.

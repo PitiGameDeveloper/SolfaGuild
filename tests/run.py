@@ -547,6 +547,52 @@ def t_lfs_edges():
     check('oferta a otro sanador', offer(C))
     no_errors(w, 'LFS alter tarde')
 
+def t_lfs_send():
+    print('\n== LFS: 2 DPS a la vez, también con el juego limitando mensajes ==')
+    def world():
+        w = World(True)
+        L = w.add('L', {'Lider Uno': {'class': 'WARLOCK', 'level': 20}}, 'Lider Uno')
+        M = w.add('M', {'Mago Dos': {'class': 'MAGE', 'level': 20}}, 'Mago Dos')
+        R = w.add('R', {'Picaro Tres': {'class': 'ROGUE', 'level': 20}}, 'Picaro Tres')
+        w.start()
+        return w, L, M, R
+    limit = 'local o = C_ChatInfo.SendAddonMessage; __n = %d; C_ChatInfo.SendAddonMessage = function(...) if __n > 0 then __n = __n - 1; return %s end; return o(...) end'
+
+    w, L, M, R = world()
+    L.ev('SG.UILFS:OpenSearch(SG.DungeonById.vc)')
+    S = 'SolfaGuildLFSSearch'
+    L.ev('for _ = 1, 2 do %s.D:GetScript("OnClick")(%s.D, "LeftButton") end; %s.go:Click()' % (S, S, S))
+    w.run(1)
+    check('desde la ventana: dos ofertas a la vez', offer(M) and offer(R), L.ret(S + '.why:GetText()'))
+    no_errors(w, 'dos ofertas')
+
+    w, L, M, R = world()
+    L.ev(limit % (3, '3'))
+    start(L, 0, 0, 2)
+    w.run(4)
+    check('el juego limita los mensajes: llegan las dos', offer(M) and offer(R))
+
+    w, L, M, R = world()
+    L.ev(limit % (2, 'false'))
+    start(L, 0, 0, 2)
+    w.run(3)
+    check('cliente que da false: también llegan', offer(M) and offer(R))
+
+    w, L, M, R = world()
+    L.ev(limit % (5, '3'))
+    start(L, 0, 0, 2)
+    w.run(8)
+    check('si un mensaje no sale nunca, la cola sigue', L.ret('SG.Comm:QueueSize()') == 0 and (offer(M) or offer(R)))
+
+    w, L, M, R = world()
+    L.ev('SG.Comm:Send({ t = "PRUEBA", x = string.rep("a", 5000) })')
+    start(L, 0, 0, 2)
+    w.run(0.5)
+    check('las ofertas adelantan a un perfil largo', offer(M) and offer(R) and L.ret('SG.Comm:QueueSize()') > 0, L.ret('SG.Comm:QueueSize()'))
+    w.run(8)
+    check('y el mensaje largo sale después', L.ret('SG.Comm:QueueSize()') == 0, L.ret('SG.Comm:QueueSize()'))
+    no_errors(w, 'mensajes limitados')
+
 # ------------------------------------------------------------------ UI
 def t_ui():
     print('\n== Interfaz ==')
@@ -853,7 +899,7 @@ def t_cositas():
     no_errors(w, 'Cositas')
 
 TESTS = [t_cositas, lambda: t_names(0), lambda: t_names(1), lambda: t_names(2), t_migration, t_chars, t_pvp, t_classic, t_sos,
-         lambda: t_lfs(0), lambda: t_lfs(1), lambda: t_lfs(2), t_lfs_edges, t_ui, t_dungeons]
+         lambda: t_lfs(0), lambda: t_lfs(1), lambda: t_lfs(2), t_lfs_edges, t_lfs_send, t_ui, t_dungeons]
 
 for strict in ('', '1'):
     os.environ['STRICT'] = strict
