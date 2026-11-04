@@ -619,13 +619,15 @@ local function build()
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     tinsert(UISpecialFrames, "SolfaGuildFrame")
     frame.sgTitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    frame.sgTitle:SetPoint("TOPLEFT", 12, -6)
+    -- mismo margen a los dos lados de la barra (a la derecha, sin pisar el botón de cerrar)
+    local BAR_MARGIN = 32
+    frame.sgTitle:SetPoint("TOPLEFT", BAR_MARGIN, -6)
     frame.sgTitle:SetText(SG.ICON .. " SolfaGuild")
 
     -- Solfers conectados, a la izquierda del botón de cerrar
     frame.online = CreateFrame("Frame", nil, frame)
     frame.online:SetSize(60, 20)
-    frame.online:SetPoint("TOPRIGHT", -78, -2)
+    frame.online:SetPoint("TOPRIGHT", -BAR_MARGIN, -2)
     frame.online:EnableMouse(true)
     frame.online:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")

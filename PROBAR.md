@@ -46,7 +46,7 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] La rejilla no deja huecos: la primera mazmorra va en la fila 1, columna 1.
 - [ ] La lista se abre arriba del todo: primero las disponibles y luego las bloqueadas, cada grupo de mayor a menor nivel.
 - [ ] **Ventana de búsqueda**: salen los iconos del LFG (atlas `UI-LFG-RoleIcon-*`, los usa la interfaz de Forever), nítidos y con el brillo alrededor al encenderlos. Si no estuvieran, salen los iconos 134952, 136041 y 132223 recortados en redondo y con aro dorado: comprobarlo también en Classic Era. En los tres círculos el clic izquierdo añade y el derecho quita (tanque y sanador, 0 o 1; DPS, de 0 a 3). Con tanque, sanador y 3 DPS se apaga "Buscar".
-- [ ] **Ventana principal**: "SolfaGuild" sale a la izquierda; a la derecha, a unos 50 px del botón de cerrar, el número de conectados de la guild y el icono de `Media\silbando.tga`. El número cambia cuando alguien entra o sale. Al pasar el ratón sale el tooltip "Solfamiders conectados", y la ventana se sigue pudiendo arrastrar desde el resto de la barra.
+- [ ] **Ventana principal**: "SolfaGuild" sale a 32 px de la izquierda; a 32 px de la derecha, sin pisar el botón de cerrar, el número de conectados de la guild y el icono de `Media\silbando.tga`. El número cambia cuando alguien entra o sale. Al pasar el ratón sale el tooltip "Solfamiders conectados", y la ventana se sigue pudiendo arrastrar desde el resto de la barra.
 - [ ] El tick verde sale en las mazmorras completadas.
 - [ ] La búsqueda llega a quien toca, en el orden correcto, y nunca a quien no llega al nivel.
 - [ ] Quien acepta sale de su grupo y entra **sin pulsar nada más**.
