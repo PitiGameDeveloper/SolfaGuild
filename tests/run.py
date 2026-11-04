@@ -68,6 +68,74 @@ def t_migration():
     check('main actualizado', a.ret('SG.db.my.main') == 'Ana Uno')
     no_errors(w, 'migración')
 
+def t_chars():
+    print('\n== Personajes borrados y vueltos a crear ==')
+    def sync():
+        w.push_roster()
+        a.ev('SG:BroadcastProfile()')
+        w.run(2)
+    w = World(True)
+    alt = {'class': 'ROGUE', 'level': 30}
+    a = w.add('a', {'Ana Uno': {'class': 'MAGE', 'level': 20}, 'Ana Alt': alt}, 'Ana Uno')
+    b = w.add('b', {'Beto Dos': {'class': 'MAGE', 'level': 20}}, 'Beto Dos')
+    a.ev('SolfaGuildDB.my.main = "Ana Alt"; SolfaGuildDB.my.chars["Ana Alt"].kills = 5')
+    w.start(12)
+    def sees(c): return c.ret('SG:Accounts().a.chars["Ana Alt"] ~= nil')
+    check('el alter sale en mi lista y en la de otro', sees(a) and sees(b))
+    w.members.remove(('Ana Alt', alt))
+    sync()
+    check('borrado: desaparece de mi lista', not sees(a))
+    check('borrado: desaparece de la de otro', not sees(b))
+    check('borrado era el main: pasa a uno que existe', b.ret('SG:Accounts().a.main') == 'Ana Uno')
+    check('sus datos no se tocan', a.ret('SG.db.my.chars["Ana Alt"].kills') == 5)
+    a.ev('GetGuildRosterShowOffline = function() return false end')
+    w.members.append(('Ana Alt', alt))
+    sync()
+    check('vuelve a la guild: vuelve a salir', sees(a) and sees(b))
+    w.members.remove(('Ana Alt', alt))
+    sync()
+    check('desconectados ocultos: no se da por borrado', sees(a))
+    a.ev('GetGuildRosterShowOffline = function() return true end')
+    w.members = [m for m in w.members if m[0] != 'Ana Uno']
+    sync()
+    check('lista de la guild sin cargar: no se da por borrado', sees(a))
+    no_errors(w, 'personajes borrados')
+
+    print(' el perfil, cada minuto si cambia')
+    w = World(True)
+    a = w.add('a', {'Ana Uno': {'class': 'MAGE', 'level': 20}}, 'Ana Uno')
+    b = w.add('b', {'Beto Dos': {'class': 'MAGE', 'level': 20}}, 'Beto Dos')
+    w.start(12)
+    def sends():
+        return sum(1 for s in w.sent if s[0] == 'PROF' and s[1] == 'Ana Uno' and s[2] == 'GUILD')
+    w.run(50)
+    n = sends()
+    w.run(100)
+    check('sin cambios no se envía', sends() == n, (n, sends()))
+    a.ev('SG:MyChar().kills = 5')
+    w.run(61)
+    check('con un cambio, llega en un minuto', sends() == n + 1 and b.ret('SG:Accounts().a.chars["Ana Uno"].kills') == 5, (n, sends()))
+    n = sends()
+    w.run(60)
+    check('y no se repite', sends() == n, (n, sends()))
+    w.run(25)
+    check('cada 5 min se envía aunque no cambie', sends() == n + 1, (n, sends()))
+    no_errors(w, 'perfil cada minuto')
+
+    def login(saved):
+        w = World(True)
+        a = w.add('a', {'Ana Uno': {'class': 'MAGE', 'level': 20}}, 'Ana Uno')
+        a.ev('local c = SolfaGuildDB.my.chars["Ana Uno"]; c.kills = 9; c.earned = 50; ' + saved)
+        w.start(2)
+        return a.ret('SG.db.my.chars["Ana Uno"].kills'), a.ret('SG.db.my.chars["Ana Uno"].guid')
+    guid = 'Player-1-Ana'
+    check('mismo identificador: mismos datos', login('c.guid = %r' % guid) == (9, guid))
+    check('otro identificador: empieza de cero', login('c.guid = "Player-1-Viejo"') == (0, guid))
+    check('otro reino: es un traslado, mismos datos', login('c.guid = "Player-2-Ana"') == (9, guid))
+    check('sin identificador: mismos datos', login('') == (9, guid))
+    check('sin identificador y otra clase: de cero', login('c.class = "ROGUE"') == (0, guid))
+    check('sin identificador y nivel más alto: de cero', login('c.level = 40') == (0, guid))
+
 # ------------------------------------------------------------------ PvP
 def died(cs, guid, party_of=()):
     for c in cs:
@@ -784,7 +852,7 @@ def t_cositas():
     check('tras reiniciar el medidor sigue sumando', stat('heal') == 990, stat('heal'))
     no_errors(w, 'Cositas')
 
-TESTS = [t_cositas, lambda: t_names(0), lambda: t_names(1), lambda: t_names(2), t_migration, t_pvp, t_classic, t_sos,
+TESTS = [t_cositas, lambda: t_names(0), lambda: t_names(1), lambda: t_names(2), t_migration, t_chars, t_pvp, t_classic, t_sos,
          lambda: t_lfs(0), lambda: t_lfs(1), lambda: t_lfs(2), t_lfs_edges, t_ui, t_dungeons]
 
 for strict in ('', '1'):

@@ -110,7 +110,7 @@ local function bestChar(acc, d, need, online)
     local best
     for name, c in pairs(acc.chars) do
         local r = SG.roster[name]
-        -- el roster está más al día que el perfil, que viaja cada 5 min
+        -- el roster está más al día que el perfil, que viaja cada minuto como mucho
         local level = math.max(r and r.level or 0, c.level or 0)
         local class = c.class or (r and r.class)
         local tier = tierOf(d, level, c)

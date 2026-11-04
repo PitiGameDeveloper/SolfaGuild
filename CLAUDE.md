@@ -43,7 +43,11 @@
   (Attune, MuddyBoots, NeedRoll y AtlasLootClassic ya resuelven muchas de estas cosas). Es mejor fuente que las guías.
 - **Rendimiento mínimo, sobre todo en banda.** Usar eventos raros o `hooksecurefunc`. Si una estadística no se
   puede contar barato, no se hace. Los contadores que
-  cambian a menudo no llaman a `SG:MarkDirty()`: viajan con el latido de 5 min del perfil.
+  cambian a menudo no llaman a `SG:MarkDirty()`: el perfil se comprueba cada minuto y solo sale si ha cambiado (sin
+  contar el tiempo jugado), o cada 5 min aunque no haya cambiado.
+- **Personajes borrados o vueltos a crear.** El juego no da la lista de personajes de la cuenta. Uno que ya no sale en la
+  lista completa de la guild deja de contar, pero sus datos no se tocan (`SG:MyGuildChars`). Si entra otro con el mismo
+  nombre y otro `UnitGUID` en el mismo reino, empieza de cero (`Core.lua`); con otro reino es un traslado y los conserva.
 - Datos nuevos de personaje: si se guardan en `SG:MyChar()` y viajan en el perfil, añadirlos también a
   `restoreFrom` de `Modules/Players.lua` (recupera la cuenta desde la guild si se borra el `WTF`). Mientras
   `SG.restoring` es cierto no se envía el perfil ni salen hitos.

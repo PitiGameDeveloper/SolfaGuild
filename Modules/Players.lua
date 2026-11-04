@@ -43,6 +43,9 @@ local function readRoster()
         end
     end
     SG.roster = roster
+    -- con los desconectados ocultos, o sin haber cargado aún, no se sabe quién falta
+    SG.rosterFull = roster[SG:MyName()] ~= nil
+        and (not GetGuildRosterShowOffline or GetGuildRosterShowOffline()) and true or false
     -- quien se desconecta ya no tiene el addon "online"
     for name in pairs(SG.addonOnline) do
         if roster[name] and not roster[name].online then SG.addonOnline[name] = nil end
@@ -106,12 +109,16 @@ function SG:CheckWeek(c)
     end
 end
 
--- Personajes de mi cuenta que están en la guild actual
+-- Personajes de mi cuenta que están en la guild actual. El juego no da la lista de
+-- personajes de la cuenta: uno borrado se nota porque ya no sale en la guild. Solo se
+-- deja de contar, sin tocar sus datos, y al enviar el perfil los demás también lo pierden.
 function SG:MyGuildChars()
-    local g = self:GuildName()
+    local g, me = self:GuildName(), self:MyName()
     local out = {}
     for name, c in pairs(self.db.my.chars) do
-        if c.guild == g or name == self:MyName() then out[name] = c end
+        if name == me or (c.guild == g and not (self.rosterFull and not self.roster[name])) then
+            out[name] = c
+        end
     end
     return out
 end
@@ -292,13 +299,27 @@ end
 local dirty = false
 function SG:MarkDirty() dirty = true end
 
+-- Para saber si el perfil ha cambiado. El tiempo jugado no cuenta: cambia siempre.
+local sentKey
+local function profileKey(p)
+    local updated, played = p.updated, {}
+    p.updated = nil
+    for name, c in pairs(p.chars) do played[name], c.played = c.played, nil end
+    local key = Comm:Serialize(p)
+    p.updated = updated
+    for name, c in pairs(p.chars) do c.played = played[name] end
+    return key
+end
+
 function SG:BroadcastProfile(channel, target)
     -- recuperando datos: no enviamos una cuenta nueva a cero que tape a la buena
     if not IsInGuild() or self.restoring then return end
     local p = self:BuildMyProfile(true)
+    local guild = not channel or channel == "GUILD"
+    if guild then sentKey = profileKey(p) end
     p.t = "PROF"
     Comm:Send(p, channel or "GUILD", target)
-    if not channel or channel == "GUILD" then dirty = false end
+    if guild then dirty = false end
 end
 
 local function storeAccount(p, sender)
@@ -552,13 +573,14 @@ function P:OnLogin()
         SG:TryRestoreStored()
         if IsInGuild() then SG:SendHello() end
     end)
+    -- cada minuto el perfil, si ha cambiado; cada 5 siempre, para quien acaba de llegar
+    local beats = 0
     C_Timer.NewTicker(60, function()
         SG:RequestRoster()
-        if dirty and IsInGuild() then SG:BroadcastProfile() end
-    end)
-    -- latido cada 5 min para quien acaba de llegar
-    C_Timer.NewTicker(300, function()
-        if IsInGuild() then SG:BroadcastProfile() end
+        beats = beats + 1
+        if IsInGuild() and (dirty or beats % 5 == 0 or profileKey(SG:BuildMyProfile(true)) ~= sentKey) then
+            SG:BroadcastProfile()
+        end
     end)
 end
 

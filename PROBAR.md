@@ -14,6 +14,10 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] **Mensajes entre jugadores**: las estadísticas de uno le llegan al otro, y los susurros de addon también llegan (`SG:Target`).
 - [ ] Se reconoce al GM: solo él y sus alters ven la pestaña *GM*, y sus ajustes llegan a los demás.
 - [ ] Un personaje que ya hubiera entrado con una versión anterior conserva sus datos al entrar.
+- [ ] **Personaje borrado**: crear un alter, meterlo en la guild, entrar con él y borrarlo. Desaparece de tu lista y de la de los demás en un par de minutos. Mirar que un alter desconectado que sigue en la guild no desaparece nunca (si pasara, ver cómo da `GetGuildRosterInfo` la lista con los desconectados).
+- [ ] **Mismo nombre**: borrar ese alter y crear otro con el mismo nombre. Empieza de cero, y el LFS y los rankings van bien.
+- [ ] **Cambio de reino**: si Forever tiene traslados, un personaje trasladado conserva sus datos (`UnitGUID` cambia de reino).
+- [ ] **Perfil cada minuto**: lo que hace un jugador le llega al otro en un minuto como mucho, sin tirones en banda.
 - [ ] Todas las pestañas se abren y **se ven bien**: nunca se ha visto ninguna ventana dibujada.
 
 ## 2. Asesinatos PvP

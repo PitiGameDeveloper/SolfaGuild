@@ -394,6 +394,17 @@ SG:On("ADDON_LOADED", function(name)
     end
 end)
 
+-- ¿Lo guardado con este nombre es de otro personaje, borrado y vuelto a crear?
+local function isOtherChar(c, guid)
+    if c.guid then
+        -- con otro reino es el mismo personaje, trasladado
+        return c.guid ~= guid and c.guid:match("^Player%-(%d+)") == guid:match("^Player%-(%d+)")
+    end
+    -- guardado antes de tener el identificador: la clase no cambia y el nivel no baja
+    return (c.class and c.class ~= select(2, UnitClass("player")))
+        or (tonumber(c.level) or 0) > UnitLevel("player")
+end
+
 SG:On("PLAYER_LOGIN", function()
     -- de versiones anteriores, que en Forever guardaban solo el nombre sin apellido
     local first, full = (UnitName("player")), SG:MyName()
@@ -402,7 +413,10 @@ SG:On("PLAYER_LOGIN", function()
         chars[full], chars[first] = chars[first], nil
         if SG.db.my.main == first then SG.db.my.main = full end
     end
+    local guid = SG:Open(UnitGUID("player"))
+    if guid and chars[full] and isOtherChar(chars[full], guid) then chars[full] = nil end
     local c = SG:MyChar()
+    c.guid = guid or c.guid
     c.class = select(2, UnitClass("player"))
     c.level = UnitLevel("player")
     if not SG.db.my.main then SG.db.my.main = SG:MyName() end

@@ -6,7 +6,7 @@
 -- combate (curación, bufos, resurrecciones, jabalíes y caídas): tiene su propio
 -- marco y lo primero que hace es comparar el GUID de origen/destino con el
 -- tuyo, así que lo que no sea tuyo se descarta sin más trabajo.
--- Los contadores no fuerzan envíos: viajan con el latido de 5 min del perfil.
+-- Los contadores no fuerzan envíos: viajan con el perfil, que sale cada minuto si ha cambiado.
 --
 -- En Forever no hay registro de combate (ver la sección "Forever"):
 -- Paracaidista, por el resumen de muerte. Colegón y Ángel de la guarda, por los
