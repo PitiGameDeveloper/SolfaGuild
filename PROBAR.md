@@ -72,7 +72,7 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] **Meta chaser**: cuenta `ConfirmTalentWipe`. Si Forever reinicia talentos de otra forma, hay que contarlo de otra manera.
 - [ ] **Broker** y **Manos callosas**: siguen existiendo `ERR_AUCTION_WON_S`, `LOOT_ITEM_CREATED_SELF` y `LOOT_ITEM_CREATED_SELF_MULTIPLE`.
 - [ ] **Fumeta**: recoger hierbas suma (hechizo 2366, se compara por nombre).
-- [ ] **Sediento de sangre**: suma en territorio enemigo (`C_PvP.GetZonePVPInfo` o `GetZonePVPInfo`).
+- [ ] **Camper**: suma en territorio enemigo (`C_PvP.GetZonePVPInfo` o `GetZonePVPInfo`).
 - [ ] **Bunny Hopper**, **Ludópata**, **Ninja**, **Stalker** y **Sobón**: suman (`JumpOrAscendStart`, `RandomRoll`, `RollOnLoot`, `InspectUnit`, `DoEmote`). Si una de esas funciones no existe, la categoría se queda a 0 sin dar error.
 - [ ] Nota musical en los susurros de compañeros y aviso de invitación (`ChatFrameUtil.AddMessageEventFilter`, `StaticPopup_Resize`).
 
