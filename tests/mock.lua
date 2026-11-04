@@ -78,6 +78,8 @@ function M:SetPoint(...) self._point = { ... } end
 function M:SetVerticalScroll(v) self._vs = v end
 function M:GetVerticalScroll() return self._vs end
 function M:CreateTexture() return new("texture") end
+function M:CreateMaskTexture() return new("texture") end
+function M:SetAtlas(a) self._atlas = a end
 function M:CreateFontString() return new("font") end
 function M:GetNormalTexture() return new("texture") end
 function M:GetFont() return "font", 12, "" end

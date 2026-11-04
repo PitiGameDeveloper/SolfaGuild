@@ -150,28 +150,23 @@ end
 local search
 local MAX_NEED, MAX_DPS = 4, 3   -- tú ocupas la quinta plaza del grupo
 
--- Iconos de función del buscador de grupo: el atlas si el cliente lo tiene y, si no, el archivo
-local ROLE_FILE = "Interface\\LFGFrame\\UI-LFG-ICON-ROLES"
-local ROLE_ICON = {
-    T = { atlas = "groupfinder-icon-role-large-tank", 0, 67 / 256, 67 / 256, 134 / 256 },
-    H = { atlas = "groupfinder-icon-role-large-heal", 67 / 256, 134 / 256, 0, 67 / 256 },
-    D = { atlas = "groupfinder-icon-role-large-dps", 67 / 256, 134 / 256, 67 / 256, 134 / 256 },
-}
-
-local function setRoleIcon(tex, role)
-    local i = ROLE_ICON[role]
-    if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(i.atlas) then
-        tex:SetAtlas(i.atlas)
-    else
-        tex:SetTexture(ROLE_FILE)
-        tex:SetTexCoord(i[1], i[2], i[3], i[4])
-    end
-end
+-- Los iconos del LFG del juego. Si el cliente no los tiene, otros del juego por su
+-- identificador de archivo (inv_shield_06, spell_nature_healingtouch y
+-- ability_meleedamage), recortados en redondo y con un aro.
+local MEDIA = "Interface\\AddOns\\SolfaGuild\\Media\\"
+local ROUND_MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+local ROLE_ATLAS = { T = "UI-LFG-RoleIcon-Tank", H = "UI-LFG-RoleIcon-Healer", D = "UI-LFG-RoleIcon-DPS" }
+local ROLE_ICON = { T = 134952, H = 136041, D = 132223 }
+local ROLE_GLOW = { T = { 0.25, 0.6, 1 }, H = { 0.25, 1, 0.4 }, D = { 1, 0.3, 0.25 } }
 
 -- Apagado, gris; encendido, con su color y brillo
 local function setRoleLit(b, lit)
     b.icon:SetDesaturated(not lit)
     b.icon:SetAlpha(lit and 1 or 0.5)
+    if b.ring then
+        b.ring:SetDesaturated(not lit)
+        b.ring:SetAlpha(lit and 1 or 0.5)
+    end
     b.glow:SetShown(lit)
 end
 
@@ -190,16 +185,34 @@ local function buildRole(f, role, x)
     b:SetPoint("TOP", x, -6)
     b.glow = b:CreateTexture(nil, "BACKGROUND")
     b.glow:SetPoint("CENTER")
-    b.glow:SetSize(84, 84)
-    setRoleIcon(b.glow, role)
+    b.glow:SetSize(100, 100)
+    b.glow:SetTexture(MEDIA .. "rol_brillo")
     b.glow:SetBlendMode("ADD")
+    local c = ROLE_GLOW[role]
+    b.glow:SetVertexColor(c[1], c[2], c[3])
     b.icon = b:CreateTexture(nil, "ARTWORK")
     b.icon:SetAllPoints()
-    setRoleIcon(b.icon, role)
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
-    setRoleIcon(hl, role)
     hl:SetBlendMode("ADD")
+    local atlas = ROLE_ATLAS[role]
+    if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) then
+        b.icon:SetAtlas(atlas)
+        hl:SetAtlas(atlas)
+    else
+        -- el icono, sin su borde de fábrica y recortado en redondo
+        local mask = b:CreateMaskTexture()
+        mask:SetAllPoints()
+        mask:SetTexture(ROUND_MASK, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        for _, tex in ipairs({ b.icon, hl }) do
+            tex:SetTexture(ROLE_ICON[role])
+            tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            tex:AddMaskTexture(mask)
+        end
+        b.ring = b:CreateTexture(nil, "ARTWORK", nil, 1)
+        b.ring:SetAllPoints()
+        b.ring:SetTexture(MEDIA .. "rol_aro")
+    end
     hl:SetAlpha(0.3)
     b.label = W:Label(b, roleName(role), "GameFontHighlightSmall")
     b.label:SetPoint("TOP", b, "BOTTOM", 0, -4)
@@ -234,10 +247,10 @@ local function buildSearch()
             updateForm(f)
         end)
     end
-    -- DPS: la mitad derecha del círculo suma y la izquierda resta
-    f.D:SetScript("OnClick", function(self)
-        local x = GetCursorPosition() / self:GetEffectiveScale()
-        local n = f.need.D + (x >= self:GetCenter() and 1 or -1)
+    -- DPS: clic derecho suma, clic izquierdo resta
+    f.D:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    f.D:SetScript("OnClick", function(_, button)
+        local n = f.need.D + (button == "RightButton" and 1 or -1)
         f.need.D = math.max(0, math.min(MAX_DPS, n))
         f.why:SetText("")
         updateForm(f)

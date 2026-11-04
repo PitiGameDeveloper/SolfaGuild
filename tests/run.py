@@ -496,6 +496,9 @@ def t_ui():
     check('todas las pestañas sin error', not a.errors and not [p for p in a.prints if 'error:' in p], (a.errors[:2], a.prints[-2:]))
     a.ev('SG.UI:Show("dungeons")')
     check('conectados en la ventana', a.ret('SolfaGuildFrame.onlineCount:GetText()') == 2, a.ret('SolfaGuildFrame.onlineCount:GetText()'))
+    a.ev('SolfaGuildFrame.online:GetScript("OnEnter")(SolfaGuildFrame.online)')
+    check('tooltip de conectados', a.ret('GameTooltip:GetText()') == 'Solfamiders conectados', a.ret('GameTooltip:GetText()'))
+    a.ev('SolfaGuildFrame.online:GetScript("OnLeave")(SolfaGuildFrame.online)')
     check('modos Total, Semanal, LFS', a.ret('#__pve.modeButtons') == 3)
     a.ev('__pve:Refresh()')
     check('panel LFS oculto en Total', a.ret('__panel:IsShown()') is False)
@@ -537,9 +540,9 @@ def t_ui():
     a.ev('SolfaGuildLFSSearch.go:Click()')
     check('sin elegir nada avisa', 'Elige' in (a.ret('SolfaGuildLFSSearch.why:GetText()') or ''), a.ret('SolfaGuildLFSSearch.why:GetText()'))
     S = 'SolfaGuildLFSSearch'
-    # el círculo está centrado en 0 en el simulador: x positiva es la mitad derecha
-    def dps(x): a.ev('GetCursorPosition = function() return %d, 0 end; %s.D:Click()' % (x, S))
-    LEFT, RIGHT = -10, 10
+    def dps(button): a.ev('%s.D:GetScript("OnClick")(%s.D, %r)' % (S, S, button))
+    LEFT, RIGHT = 'LeftButton', 'RightButton'
+    check('sin los iconos del LFG: los otros, con aro', a.ret(S + '.T.ring ~= nil') and a.ret(S + '.T.icon._atlas') is None)
     dps(LEFT)
     check('DPS no baja de 0', a.ret(S + '.need.D') == 0)
     for _ in range(5): dps(RIGHT)
@@ -591,6 +594,12 @@ def t_ui():
     w.run(0.2)
     check('nivel 5: se abre desde el principio', c.ret('__panel.scroll:GetVerticalScroll()') == 0, c.ret('__panel.scroll:GetVerticalScroll()'))
     check('nivel 5: la primera, en fila 1 y columna 1', (c.ret('__panel.cards[1]._point[2]'), c.ret('__panel.cards[1]._point[3]')) == (0, 0))
+    c.ev('C_Texture = { GetAtlasInfo = function() return {} end }; SG.UILFS:OpenSearch(SG.Dungeons[1])')
+    S = 'SolfaGuildLFSSearch'
+    check('con los iconos del LFG: se usan esos', [c.ret(S + '.%s.icon._atlas' % r) for r in 'THD'] == ['UI-LFG-RoleIcon-Tank', 'UI-LFG-RoleIcon-Healer', 'UI-LFG-RoleIcon-DPS'])
+    check('con los iconos del LFG: sin aro', c.ret(S + '.T.ring == nil') is True)
+    c.ev(S + '.T:Click()')
+    check('con los iconos del LFG: se encienden', c.ret(S + '.T.glow:IsShown()') is True)
     no_errors(w, 'LFS a nivel bajo')
 
 def t_dungeons():
