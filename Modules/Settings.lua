@@ -13,7 +13,7 @@ S.defaults = {
     features = {
         pvp = true, gold = true, dungeons = true, playtime = true, cositas = true,
         lfs = true, whisperIcon = true, inviteIcon = true,
-        zoneNotify = true, events = true, campSOS = true,
+        zoneNotify = true, events = true, campSOS = true, guildMap = true,
     },
     zoneCooldown = 30,      -- minutos entre avisos de la misma zona
     eventReminder = 10,     -- minutos de antelación del aviso de evento

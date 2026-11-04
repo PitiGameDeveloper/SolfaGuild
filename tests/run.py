@@ -826,6 +826,12 @@ def t_ui():
     check('con los iconos del LFG: sin aro', c.ret(S + '.T.ring == nil') is True)
     c.ev(S + '.T:Click()')
     check('con los iconos del LFG: se encienden', c.ret(S + '.T.glow:IsShown()') is True)
+    c.ev('SG:Fire("TEST_LFS")')
+    atlas = {'T': 'UI-LFG-RoleIcon-Tank', 'H': 'UI-LFG-RoleIcon-Healer', 'D': 'UI-LFG-RoleIcon-DPS'}
+    roles = radios(c)
+    check('la oferta lleva el icono de cada función', len(roles) == 3 and all(c.ret('SolfaGuildLFSOffer.radios[%d].icon._atlas' % i) == atlas[r] for r, i in roles.items()), roles)
+    check('el icono es pequeño', c.ret('SolfaGuildLFSOffer.radios[1].icon:GetWidth()') == 14)
+    no(c)
     no_errors(w, 'LFS a nivel bajo')
 
 def card_shown(c):
@@ -1197,7 +1203,146 @@ def t_cositas():
     check('tras reiniciar el medidor sigue sumando', stat('heal') == 990, stat('heal'))
     no_errors(w, 'Cositas')
 
-TESTS = [t_cositas, lambda: t_names(0), lambda: t_names(1), lambda: t_names(2), t_migration, t_chars, t_pvp, t_pvp_ladder, t_classic, t_sos,
+# ------------------------------------------------------------------ mapa de la guild
+def t_guildmap(forever):
+    print('\n== Mapa de la guild (%s) ==' % ('Forever' if forever else 'Classic Era'))
+    w = World(forever, 0)
+    def ch(cl): return {'class': cl, 'level': 40}
+    an, bn, cn = ('Ana Uno', 'Beto Dos', 'Ciro Tres') if forever else ('Ana', 'Beto', 'Ciro')
+    a = w.add('a', {an: ch('WARRIOR')}, an)
+    b = w.add('b', {bn: ch('MAGE')}, bn)
+    c = w.add('c', {cn: ch('ROGUE')}, cn)
+    a.ev('RAID_CLASS_COLORS.MAGE = { r = 0.25, g = 0.75, b = 1 }')
+    w.start()
+    def n_sent(kind, who=None): return sum(1 for s in w.sent if s[0] == kind and (who is None or s[1] == who))
+    def pin(name): return 'SG.GuildMap.pins[%r]' % name
+    def on_map(name): return bool(a.ret('%s ~= nil and %s:IsShown()' % (pin(name), pin(name))))
+    def nx(name): return a.ret('%s.nx' % pin(name))
+    def near(v, want): return v is not None and abs(v - want) < 1e-3
+
+    w.sent.clear()
+    w.run(120)
+    check('sin nadie mirando no sale ninguna posición', n_sent('POS') == 0 and n_sent('MAP_ON') == 0, n_sent('POS'))
+
+    a.ev('WorldMapFrame:Show()')
+    w.run(1)
+    check('al abrir el mapa se avisa una vez', n_sent('MAP_ON') == 1, n_sent('MAP_ON'))
+    check('los demás contestan', n_sent('POS', bn) == 1 and n_sent('POS', cn) == 1, n_sent('POS'))
+    check('nadie me pide a mí la posición', n_sent('POS', a.name) == 0)
+    check('salen en el mapa', on_map(bn) and on_map(cn))
+    check('en su sitio', near(nx(bn), 0.5))
+    col = a.ret('%s.tex._color' % pin(bn))
+    check('con el color de su clase', col and near(col[1], 0.25) and near(col[2], 0.75) and near(col[3], 1))
+    check('chamán siempre azul', near(a.ret('select(3, SG:ClassRGB("SHAMAN"))'), 0xdd / 255))
+    check('sin clase, blanco', a.ret('(select(2, SG:ClassRGB(nil)))') == 1)
+    check('yo no salgo', not a.ret('%s ~= nil' % pin(a.name)))
+
+    a.ev('%s._over = true; %s:GetScript("OnEnter")(%s)' % (pin(bn), pin(bn), pin(bn)))
+    tip = a.ret('TIP[1]')
+    check('el ratón enseña el nombre', a.ret('#TIP') == 1 and bn in tip and tip.startswith('|cff'), tip)
+    a.ev('%s._over = true; %s:GetScript("OnEnter")(%s)' % (pin(cn), pin(cn), pin(cn)))
+    check('si hay varios, salen todos', a.ret('#TIP') == 2 and cn in a.ret('TIP[2]'))
+    a.ev('%s._over = false; %s._over = false' % (pin(bn), pin(cn)))
+
+    n = n_sent('POS')
+    w.run(10)
+    check('quien no se mueve no repite', n_sent('POS') == n, n_sent('POS') - n)
+    b.g.POS_X = 0.6
+    w.run(5)
+    check('quien se mueve, sí', n_sent('POS', bn) == 2 and n_sent('POS', cn) == 1, n_sent('POS', bn))
+    check('y se mueve en el mapa', near(nx(bn), 0.6), nx(bn))
+    w.run(30)
+    check('aunque no se mueva, sigue en el mapa', on_map(cn) and n_sent('POS', cn) > 1)
+
+    a.ev('WorldMapFrame:SetMapID(1414)')
+    check('en el continente, en su sitio', on_map(bn) and near(nx(bn), 0.46), nx(bn))
+    a.ev('WorldMapFrame:SetCanvasScale(2)')
+    check('acercar el mapa la deja en su sitio', near(a.ret('%s._point[4]' % pin(bn)), 300 * 0.46 * 2), a.ret('%s._point[4]' % pin(bn)))
+    a.ev('WorldMapFrame:SetCanvasScale(1)')
+    a.ev('WorldMapFrame:SetMapID(1415)')
+    check('en otro continente no sale', not on_map(bn))
+    a.ev('WorldMapFrame:SetMapID(947)')
+    check('en el mapa del mundo, sí', on_map(bn) and near(nx(bn), 0.26), nx(bn))
+    a.ev('WorldMapFrame:SetMapID(1411)')
+
+    b.g.INST = True
+    w.run(5)
+    check('al entrar en una instancia desaparece', not on_map(bn))
+    n = n_sent('POS', bn)
+    w.run(30)
+    check('dentro de una instancia no envía nada', n_sent('POS', bn) == n, n_sent('POS', bn) - n)
+    b.g.INST = False
+    w.run(5)
+    check('al salir vuelve', on_map(bn))
+
+    c.g.COMBAT = True
+    n = n_sent('POS', cn)
+    c.g.POS_X = 0.7
+    w.run(30)
+    check('en combate no envía', n_sent('POS', cn) == n, n_sent('POS', cn) - n)
+    w.run(35)
+    check('sin noticias se le quita', not on_map(cn))
+    c.g.COMBAT = False
+    w.run(5)
+    check('vuelve al acabar el combate', on_map(cn) and near(nx(cn), 0.7))
+
+    def set_online(v):
+        b.has_addon = v
+        a.ev('for _, r in ipairs(ROSTER) do if r.raw:find(%r, 1, true) then r.online = %s end end lua_fire("GUILD_ROSTER_UPDATE")'
+             % (bn, 'true' if v else 'false'))
+    set_online(False)
+    w.run(6)
+    check('quien se desconecta desaparece', not on_map(bn))
+    set_online(True)
+    b.g.POS_X = 0.61
+    w.run(5)
+
+    a.ev('WorldMapFrame:Hide()')
+    check('al cerrar el mapa se quitan', not on_map(cn))
+    n_a = n_sent('MAP_ON')
+    w.run(40)
+    n = n_sent('POS')
+    w.run(60)
+    check('al cerrarlo dejan de enviar', n_sent('POS') == n, n_sent('POS') - n)
+    a.ev('WorldMapFrame:Show(); WorldMapFrame:Hide(); WorldMapFrame:Show(); WorldMapFrame:Hide(); WorldMapFrame:Show()')
+    w.run(1)
+    check('abrir y cerrar sin parar avisa una vez', n_sent('MAP_ON') == n_a + 1, n_sent('MAP_ON') - n_a)
+    check('reabrirlo los trae otra vez', on_map(bn) and on_map(cn))
+
+    a.ev('SG:Cfg().features.guildMap = false; SG:Fire("SETTINGS_CHANGED")')
+    check('función apagada: se quitan', not on_map(bn))
+    n = n_sent('MAP_ON')
+    a.ev('WorldMapFrame:Hide(); WorldMapFrame:Show()')
+    w.run(25)
+    check('función apagada: no se avisa', n_sent('MAP_ON') == n)
+    a.ev('WorldMapFrame:Hide(); SG:Cfg().features.guildMap = true')
+    w.run(40)
+    b.ev('SG:Cfg().features.guildMap = false')
+    a.ev('WorldMapFrame:Show()')
+    n = n_sent('POS', bn)
+    w.run(10)
+    check('quien la tiene apagada no envía', n_sent('POS', bn) == n)
+    a.ev('WorldMapFrame:Hide()')
+    w.run(40)
+
+    b.ev('SG.Comm:Send({ t = "X" }, "GUILD")')
+    check('con cola no se envía la posición', b.ret('SG.Comm:SendLossy({ t = "POS" })') is False)
+    w.run(2)
+    b.ev('__send = C_ChatInfo.SendAddonMessage; C_ChatInfo.SendAddonMessage = function() return 3 end')
+    check('sin cola, sí', b.ret('SG.Comm:SendLossy({ t = "POS" })') is True)
+    w.run(2)
+    check('si el juego la limita no se reintenta', b.ret('SG.Comm:QueueSize()') == 0)
+    b.ev('C_ChatInfo.SendAddonMessage = __send')
+
+    a.ev('C_Map = nil; WorldMapFrame:Show()')
+    w.run(6)
+    a.ev('WorldMapFrame:Hide()')
+    b.ev('C_Map = nil; SG:Cfg().features.guildMap = true')
+    a.ev('WorldMapFrame:Show()')
+    w.run(25)
+    no_errors(w, 'mapa de la guild')
+
+TESTS = [lambda: t_guildmap(True), lambda: t_guildmap(False), t_cositas, lambda: t_names(0), lambda: t_names(1), lambda: t_names(2), t_migration, t_chars, t_pvp, t_pvp_ladder, t_classic, t_sos,
          lambda: t_lfs(0), lambda: t_lfs(1), lambda: t_lfs(2), t_lfs_edges, t_lfs_send, t_lfs_feedback, t_ui, t_dungeons, t_cards]
 
 for strict in ('', '1'):

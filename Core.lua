@@ -248,14 +248,18 @@ function SG:FormatTime(seconds, withSeconds)
     return out
 end
 
-function SG:ClassColor(class)
+-- Color de una clase, de 0 a 1 (blanco si no se sabe)
+function SG:ClassRGB(class)
     -- en Classic el juego le da el rosa del paladín: siempre azul
-    if class == "SHAMAN" then return "|cff0070dd" end
+    if class == "SHAMAN" then return 0, 0x70 / 255, 0xdd / 255 end
     local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
-    if c then
-        return string.format("|cff%02x%02x%02x", c.r * 255, c.g * 255, c.b * 255)
-    end
-    return "|cffffffff"
+    if c then return c.r, c.g, c.b end
+    return 1, 1, 1
+end
+
+function SG:ClassColor(class)
+    local r, g, b = self:ClassRGB(class)
+    return string.format("|cff%02x%02x%02x", r * 255 + 0.5, g * 255 + 0.5, b * 255 + 0.5)
 end
 
 function SG:InCombat()

@@ -90,7 +90,19 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] **Topes contra macros**: `/hug` con otro jugador de objetivo suma; sin objetivo, a un PNJ o a ti, no. Repetirlo no suma hasta pasados 2 min, tampoco a otra persona; un `/reload` no lo reinicia. `/hug Fulano` solo suma si lo tienes de objetivo o va en tu grupo. Comprobar que al clicar en un jugador para inspeccionarlo cuenta (Stalker), que `/roll` suma uno por minuto y el correo uno cada 30 s.
 - [ ] Nota musical en los susurros de compañeros y aviso de invitación (`ChatFrameUtil.AddMessageEventFilter`, `StaticPopup_Resize`).
 
-## 8. Otros
+## 8. Mapa de la guild (`Modules/GuildMap.lua`)
+- [ ] Al abrir el mapa, en unos segundos sale cada Solfamida conectado como un punto **del color de su clase**, con el chamán en azul (`Media/pin.tga`, también en Classic Era). Tú no sales.
+- [ ] Al pasar el ratón sale su nombre con apellido. Si hay varios juntos, salen todos.
+- [ ] **Clics**: pinchar encima de un punto sigue cambiando de zona en el mapa (`SetMouseClickEnabled`).
+- [ ] **Otros mapas**: sale bien colocado en su zona, en la zona de al lado (si cae dentro), en el continente y en el mapa del mundo; en otro continente no sale. Comprobar sobre todo el mapa del mundo (`GetMapPosFromWorldPos` y, si no da nada, `GetMapRectOnMap`). También en Orgrimmar viendo Durotar, y al revés.
+- [ ] El punto mide siempre lo mismo y no se descoloca al acercar el mapa ni con el mapa grande, y queda por encima de lo demás (`PIN_FRAME_LEVEL_AREA_POI`).
+- [ ] Se mueve al moverse el otro jugador (cada 4 s como mucho). Al entrar en una instancia desaparece y al desconectarse también (como mucho 50 s).
+- [ ] **Sin tirones ni mensajes de más**: con el mapa cerrado no sale ningún mensaje `POS`, y en banda tampoco (`/sg debug` no lo enseña: mirarlo con un addon de mensajes o por el rendimiento).
+- [ ] Un compañero de grupo sale dos veces, con el punto del juego y el nuestro. Ver si queda mal y si el tooltip del juego sale bien.
+- [ ] Con la pestaña de MuddyBoots abierta en el mapa, ese addon oculta lo de otros addons: ver que al volver a la otra pestaña vuelven a salir los puntos.
+- [ ] Apagar *Mapa de la guild* en la pestaña GM quita los puntos a todos.
+
+## 9. Otros
 - [ ] Semana: el escalafón semanal se reinicia con el reinicio del juego (`C_DateAndTime.GetSecondsUntilWeeklyReset`; si no existe, se usa el miércoles a las 05:00 del PC).
 - [ ] Eventos: crearlos, que lleguen a los demás y que salte el aviso.
 - [ ] Crear un evento en el calendario del WoW (depende de la API del cliente y de los permisos de guild).

@@ -88,6 +88,9 @@ function M:Click()
     local s = self._scripts.OnClick
     if s then s(self, "LeftButton") end
 end
+function M:SetVertexColor(r, g, b) self._color = { r, g, b } end
+function M:IsMouseOver() return self._over or false end
+function M:GetFrameLevel() return 1 end
 function M:GetCenter() return 0, 0 end
 function M:GetEffectiveScale() return 1 end
 Frame.__index = function(t, k)
@@ -101,6 +104,69 @@ function CreateFrame(kind, name, parent, template)
 end
 UIParent = new("Frame"); Minimap = new("Frame"); GameTooltip = new("Frame")
 UISpecialFrames = {}
+
+---------------------------------------------------------------- mapa del mundo
+TIP = {}
+GameTooltip.SetOwner = function() TIP = {} end
+GameTooltip.AddLine = function(_, text) TIP[#TIP + 1] = text end
+-- [mapa] = instancia y rectángulo dentro de su continente. 1414 y 1415 son continentes, 947 es el mundo entero.
+MAPS = {
+    [1411] = { inst = 1, x = 0.4, y = 0.4, w = 0.1, h = 0.2 },
+    [1414] = { inst = 1, x = 0, y = 0, w = 1, h = 1 },
+    [1415] = { inst = 0, x = 0, y = 0, w = 1, h = 1 },
+}
+MAP_ID, POS_X, POS_Y = 1411, 0.5, 0.5
+local function vec(x, y) return { x = x, y = y, GetXY = function(s) return s.x, s.y end } end
+CreateVector2D = vec
+C_Map = {
+    GetBestMapForUnit = function() return MAP_ID end,
+    GetPlayerMapPosition = function() if POS_X then return vec(POS_X, POS_Y) end end,
+    GetWorldPosFromMapPos = function(id, v)
+        local m = MAPS[id]
+        if m then return m.inst, vec(m.x + v.x * m.w, m.y + v.y * m.h) end
+    end,
+    GetMapPosFromWorldPos = function(inst, world, id)
+        local m = MAPS[id]
+        if m and m.inst == inst then return id, vec((world.x - m.x) / m.w, (world.y - m.y) / m.h) end
+    end,
+    GetMapRectOnMap = function(id, top)
+        if id == 1411 and top == 947 then return 0.2, 0.3, 0.1, 0.2 end
+        return 0, 0, 0, 0
+    end,
+}
+MapCanvasDataProviderMixin = {
+    OnAdded = function(self, map) self.owningMap = map end,
+    GetMap = function(self) return self.owningMap end,
+    OnShow = function() end, OnHide = function() end,
+    RefreshAllData = function() end,
+    OnMapChanged = function(self) self:RefreshAllData() end,
+}
+function CreateFromMixins(...)
+    local out = {}
+    for _, mixin in ipairs({ ... }) do
+        for k, v in pairs(mixin) do out[k] = v end
+    end
+    return out
+end
+WorldMapFrame = new("Frame", "WorldMapFrame")
+WorldMapFrame._shown, WorldMapFrame._map, WorldMapFrame._scale = false, 1411, 1
+WorldMapFrame._canvas = new("Frame")
+WorldMapFrame._providers = {}
+function WorldMapFrame:GetCanvas() return self._canvas end
+function WorldMapFrame:GetMapID() return self._map end
+function WorldMapFrame:GetCanvasScale() return self._scale end
+function WorldMapFrame:AddDataProvider(p) self._providers[#self._providers + 1] = p; p:OnAdded(self) end
+function WorldMapFrame:SetMapID(id)
+    self._map = id
+    for _, p in ipairs(self._providers) do p:OnMapChanged() end
+end
+function WorldMapFrame:SetCanvasScale(s)
+    self._scale = s
+    for _, p in ipairs(self._providers) do p:OnCanvasScaleChanged() end
+end
+WorldMapFrame:SetScript("OnShow", function(self) for _, p in ipairs(self._providers) do p:OnShow() end end)
+WorldMapFrame:SetScript("OnHide", function(self) for _, p in ipairs(self._providers) do p:OnHide() end end)
+
 DEFAULT_CHAT_FRAME = { AddMessage = function(_, m) py_print(m) end }
 RAID_CLASS_COLORS = setmetatable({}, { __index = function() return { r = 1, g = 1, b = 1 } end })
 SOUNDKIT = {}

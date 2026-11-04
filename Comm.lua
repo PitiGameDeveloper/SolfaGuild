@@ -108,7 +108,7 @@ sendFrame:SetScript("OnUpdate", function(self, elapsed)
     if mustRetry(rawSend(item[1], item[2], item[3])) then
         item.tries = (item.tries or 0) + 1
         wait = RETRY_WAIT
-        if item.tries < MAX_TRIES then return end
+        if item.tries < MAX_TRIES and not item.lossy then return end
     end
     table.remove(queue, 1)
 end)
@@ -137,6 +137,15 @@ function Comm:Send(msg, channel, target)
         pos = pos + 1
     end
     sendFrame:Show()
+end
+
+-- Mensaje a la guild que deja de valer enseguida (una posición): si hay cola no se envía y, si el
+-- juego lo limita, no se reintenta. Devuelve si ha entrado en la cola.
+function Comm:SendLossy(msg)
+    if #queue > 0 or not IsInGuild() then return false end
+    self:Send(msg, "GUILD")
+    for _, item in ipairs(queue) do item.lossy = true end
+    return true
 end
 
 function Comm:QueueSize() return #queue end

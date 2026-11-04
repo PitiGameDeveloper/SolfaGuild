@@ -441,6 +441,7 @@ local FEATURE_NAMES = {
     { "cositas", "Cositas" },
     { "whisperIcon", "Nota musical en susurros" }, { "inviteIcon", "Aviso de invitaciones" },
     { "zoneNotify", "Aviso de zona" }, { "events", "Eventos" }, { "campSOS", "SOS por campeo" },
+    { "guildMap", "Mapa de la guild" },
 }
 
 local function buildAdmin(parent)

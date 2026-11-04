@@ -53,6 +53,7 @@
 - **Personajes borrados o vueltos a crear.** El juego no da la lista de personajes de la cuenta. Uno que ya no sale en la
   lista completa de la guild deja de contar, pero sus datos no se tocan (`SG:MyGuildChars`). Si entra otro con el mismo
   nombre y otro `UnitGUID` en el mismo reino, empieza de cero (`Core.lua`); con otro reino es un traslado y los conserva.
+- **Mapa de la guild (`Modules/GuildMap.lua`).** Es código propio, sin librerías: del addon GuildMap no se puede copiar `GuildMapMW.lua`, que es privado. La posición solo se envía mientras alguien tiene el mapa abierto (`MAP_ON` y `POS`) y nunca dentro de una instancia. Las posiciones van con `Comm:SendLossy`: si hay cola no salen y no se reintentan, porque enseguida dejan de valer.
 - Datos nuevos de personaje: si se guardan en `SG:MyChar()` y viajan en el perfil, añadirlos también a
   `restoreFrom` de `Modules/Players.lua` (recupera la cuenta desde la guild si se borra el `WTF`). Mientras
   `SG.restoring` es cierto no se envía el perfil ni salen hitos.
