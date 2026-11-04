@@ -46,7 +46,7 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] El grupo pasa bien a banda (`ConvertToRaid`).
 
 ## 5. LFS
-- [ ] `/sg lfs` enseña la oferta de prueba: el texto cabe y se ven los botones de radio (si `UIRadioButtonTemplate` no existe, salen casillas).
+- [ ] `/sg lfs` enseña la oferta de prueba: el texto cabe y se ven los botones de radio (si `UIRadioButtonTemplate` no existe, salen casillas). Cada uno lleva su icono pequeño de tanque, sanador o DPS (atlas `UI-LFG-RoleIcon-*` o, si no está, los iconos 134952, 136041 y 132223), sin pisar el nombre.
 - [ ] **Imágenes de las tarjetas**: son las pantallas de carga del juego (`LOADING_SCREEN` en `Data/Dungeons.lua`). Comprobar que salen, que no se ven estiradas (recorte en `fillCard`, `UI/LFS.lua`) y que cada una es la de su mazmorra. Dalaran, La Ciudad Sumergida, Krol'dok, Alcaz, Faucenegra y La Terraza del Creador salen de color: falta su identificador.
 - [ ] La rejilla no deja huecos: la primera mazmorra va en la fila 1, columna 1.
 - [ ] La lista se abre arriba del todo: primero las disponibles y luego las bloqueadas, cada grupo de mayor a menor nivel.

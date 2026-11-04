@@ -408,8 +408,11 @@ local function buildOffer()
         local ok, r = pcall(CreateFrame, "CheckButton", nil, f, "UIRadioButtonTemplate")
         if not ok then r = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate") end
         r:SetSize(18, 18)
+        r.icon = r:CreateTexture(nil, "ARTWORK")
+        r.icon:SetSize(14, 14)
+        r.icon:SetPoint("LEFT", r, "RIGHT", 3, 0)
         r.label = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        r.label:SetPoint("LEFT", r, "RIGHT", 3, 0)
+        r.label:SetPoint("LEFT", r.icon, "RIGHT", 3, 0)
         r:SetScript("OnClick", function(self)
             for _, o in ipairs(f.radios) do o:SetChecked(o == self) end
             f.role = self.role
@@ -451,12 +454,20 @@ local function showOffer(o)
         if o.roles:find(role, 1, true) then roles[#roles + 1] = role end
     end
     local slotW = 110
-    local x0 = -((#roles - 1) * slotW) / 2 - 30
+    local x0 = -((#roles - 1) * slotW) / 2 - 38
     for i, r in ipairs(f.radios) do
         local role = roles[i]
         r:SetShown(role ~= nil)
         if role then
             r.role = role
+            -- el mismo icono que en la búsqueda; sin él, el de archivo sin su borde
+            local atlas = ROLE_ATLAS[role]
+            if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) then
+                r.icon:SetAtlas(atlas)
+            else
+                r.icon:SetTexture(ROLE_ICON[role])
+                r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            end
             r.label:SetText(roleName(role))
             r:ClearAllPoints()
             r:SetPoint("BOTTOM", f, "BOTTOM", x0 + (i - 1) * slotW, 56)
