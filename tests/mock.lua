@@ -244,6 +244,7 @@ function lua_setGroup(list, leader, raid)
 end
 Ambiguate = function(n) return (n:gsub("%-Reino$", "")) end
 C_ChatInfo = {
+    PerformEmote = function() return false end,
     RegisterAddonMessagePrefix = function() end,
     SendAddonMessage = function(pre, text, chan, target) py_send(text, chan, target) end,
 }
@@ -258,6 +259,8 @@ IsFlying = function() return false end
 RequestTimePlayed = function() end
 GetCursorPosition = function() return 0, 0 end
 GetSpellInfo = function(id) return "Hechizo" .. tostring(id) end
+-- como en Forever: una envoltura antigua que llama a la función nueva
+DoEmote = function(token, target) return C_ChatInfo.PerformEmote(token, target) end
 hooksecurefunc = function(a, b, c)
     if type(a) == "table" then local o = a[b]; if o then a[b] = function(...) local r = o(...); c(...); return r end end
     elseif _G[a] then local o = _G[a]; _G[a] = function(...) local r = o(...); b(...); return r end end

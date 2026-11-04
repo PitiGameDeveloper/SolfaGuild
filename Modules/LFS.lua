@@ -35,6 +35,7 @@ local ROLE_ORDER  = { "T", "H", "D" }
 LFS.ROLE_ORDER = ROLE_ORDER
 
 local run        -- búsqueda propia en curso (ver LFS:Start)
+local last       -- cómo acabó la última búsqueda: { d, need, answers, complete, text }
 local offer      -- oferta que estoy viendo: { id, from, dungeon, char, roles }
 local going      -- plaza aceptada: { id, from, t } (se acepta sola su invitación)
 local ticker
@@ -151,13 +152,41 @@ end
 
 local function needTotal(need) return need.T + need.H + need.D end
 
+-- "1 tanque, 2 DPS"
+function LFS:NeedText(need)
+    local parts = {}
+    if need.T > 0 then parts[#parts + 1] = need.T .. " tanque" end
+    if need.H > 0 then parts[#parts + 1] = need.H .. " sanador" end
+    if need.D > 0 then parts[#parts + 1] = need.D .. " DPS" end
+    return table.concat(parts, ", ")
+end
+
+function LFS:LastResult() return last end
+function LFS:ClearResult() last = nil end
+
+-- Apunta cómo va cada persona a la que se ha avisado (ver Texts.ui.lfsState)
+local function note(name, state, char, class, role)
+    local a = run.answers[name] or {}
+    run.answers[name] = a
+    a.state = state
+    a.char, a.class, a.role = char or a.char, class or a.class, role or a.role
+    return a
+end
+
+-- Quien no va, también por el chat, por si la ventana está cerrada
+local function noteOut(name, state)
+    local a = note(name, state)
+    SG:Print((a.char or name) .. ": " .. SG.Texts.ui.lfsState[state])
+end
+
 -- Ofertas que pueden estar abiertas a la vez
 local function allowedOffers(need)
     if need.T == 0 and need.H == 0 then return need.D end
     return 1
 end
 
-local function finish(text)
+-- done: ha acabado sola, no porque se haya cancelado, y se enseña el resultado
+local function finish(text, done)
     if not run then return end
     for name in pairs(run.offers) do
         Comm:Send({ t = "LFS_CANCEL", id = run.id }, "WHISPER", name)
@@ -165,22 +194,28 @@ local function finish(text)
     for name in pairs(run.slots) do
         Comm:Send({ t = "LFS_CANCEL", id = run.id }, "WHISPER", name)
     end
+    last = done and { d = run.d, need = run.need, answers = run.answers, text = done,
+        complete = needTotal(run.need) == 0 } or nil
     run = nil
     if ticker then ticker:Cancel(); ticker = nil end
     if text then SG:Print(text) end
     changed()
+    if last then SG:Fire("LFS_FINISHED") end
 end
 
 local function pump()
     if not run then return end
     local free = LFS:FreeSlots()
     if not free then
-        finish("Búsqueda cancelada: ya no eres líder del grupo.")
+        finish("Búsqueda cancelada: ya no eres líder del grupo.", "Búsqueda cancelada: ya no eres líder del grupo")
         return
     end
     -- quien ya ha entrado cuenta en el grupo, no como plaza reservada
     for name in pairs(run.slots) do
-        if inGroupWith(name) then run.slots[name] = nil end
+        if inGroupWith(name) then
+            run.slots[name] = nil
+            note(name, "inside")
+        end
     end
     -- alguien ha entrado por su cuenta: las plazas que ya no caben se dejan de buscar
     local room = free - count(run.slots)
@@ -199,6 +234,7 @@ local function pump()
             local c = cands[i]
             run.tried[c.acc.id] = true
             run.offers[c.online] = { t = GetTime(), char = c.char, class = c.class }
+            note(c.online, "wait", c.char, c.class)
             Comm:Send({ t = "LFS_OFFER", id = run.id, dg = run.d.id, char = c.char, level = c.level,
                 roles = c.roles, secs = run.secs }, "WHISPER", c.online)
             i = i + 1
@@ -207,12 +243,19 @@ local function pump()
     -- sin plazas por cubrir y todos dentro: listo. Sin ofertas ni candidatos: no hay más gente.
     if not next(run.offers) and not next(run.slots) then
         if needTotal(run.need) == 0 then
-            finish("¡Grupo completo para |cffffd100" .. run.d.name .. "|r!")
+            finish("¡Grupo completo para |cffffd100" .. run.d.name .. "|r!", "¡Grupo completo!")
         else
-            finish("No queda ningún Solfamida al que avisar para |cffffd100" .. run.d.name .. "|r.")
+            finish("No queda ningún Solfamida al que avisar para |cffffd100" .. run.d.name .. "|r. Faltan: "
+                .. LFS:NeedText(run.need) .. ".", "No queda nadie a quien avisar")
         end
         return
     end
+    -- falta gente y no hay a quién avisar, pero aún hay alguien de camino
+    local exhausted = needTotal(run.need) > 0 and not next(run.offers)
+    if exhausted and not run.exhausted then
+        SG:Print("No queda nadie más a quien avisar. Faltan: " .. LFS:NeedText(run.need) .. ".")
+    end
+    run.exhausted = exhausted
     changed()
 end
 
@@ -231,16 +274,19 @@ local function tick()
         for name, o in pairs(run.offers) do
             if (not o.seen and now - o.t > ACK_TIME) or now - o.t > run.secs + ACK_TIME then
                 run.offers[name] = nil
+                noteOut(name, o.seen and "late" or "lost")
             end
         end
         for name, s in pairs(run.slots) do
             if inGroupWith(name) then
                 run.slots[name] = nil
+                note(name, "inside")
             elseif s.ready then
                 if now - s.t >= RETRY_EVERY then
                     if s.tries >= MAX_TRIES then
                         SG:Print(name .. " no ha podido entrar en el grupo. Se busca a otro.")
                         Comm:Send({ t = "LFS_CANCEL", id = run.id }, "WHISPER", name)
+                        note(name, "failed")
                         reopen(name)
                     else
                         s.t, s.tries = now, s.tries + 1
@@ -250,6 +296,7 @@ local function tick()
             elseif now > s.expires then
                 SG:Print(s.char .. " no se ha conectado a tiempo. Se busca a otro.")
                 Comm:Send({ t = "LFS_CANCEL", id = run.id }, "WHISPER", name)
+                note(name, "failed")
                 reopen(name)
             end
         end
@@ -268,7 +315,8 @@ function LFS:Start(d, need)
     if total > free then return nil, "Solo te quedan " .. free .. " plazas libres en el grupo." end
     if #self:Candidates(d, need) == 0 then return nil, "Ahora mismo no hay ningún Solfamida disponible para esto." end
     local cfg = SG:Cfg()
-    run = { id = SG:MyName() .. ":" .. SG:RandomId(6), d = d, need = need, offers = {}, slots = {}, tried = {},
+    last = nil
+    run = { id = SG:MyName() .. ":" .. SG:RandomId(6), d = d, need = need, offers = {}, slots = {}, tried = {}, answers = {},
         secs = cfg.lfsOfferTime or 30, relog = (cfg.lfsRelogTime or 5) * 60 }
     ticker = C_Timer.NewTicker(1, tick)
     pump()
@@ -292,13 +340,17 @@ Comm:Register("LFS_ANS", function(msg, sender)
     if msg.ok then
         local role = msg.role
         if (run.need[role] or 0) < 1 then
+            note(sender, "taken")
             Comm:Send({ t = "LFS_CANCEL", id = run.id, taken = true }, "WHISPER", sender)
         else
             run.need[role] = run.need[role] - 1
             run.slots[sender] = { role = role, char = o.char, class = o.class, t = 0, tries = 0,
                 expires = GetTime() + run.relog }
+            note(sender, "yes", nil, nil, role)
             Comm:Send({ t = "LFS_OK", id = run.id, relog = run.relog }, "WHISPER", sender)
         end
+    else
+        noteOut(sender, (msg.why == "busy" or msg.why == "late") and msg.why or "no")
     end
     pump()
 end)
@@ -314,6 +366,7 @@ Comm:Register("LFS_READY", function(msg, sender)
         end
         if not key then return end
         run.slots[sender], run.slots[key] = run.slots[key], nil
+        run.answers[sender], run.answers[key] = run.answers[key], nil
     end
     local s = run.slots[sender]
     s.ready, s.tries, s.t = true, 1, GetTime()
@@ -325,8 +378,9 @@ end)
 ---------------------------------------------------------------------------
 -- Jugador: recibir la oferta
 ---------------------------------------------------------------------------
-local function answerNo(id, leader)
-    Comm:Send({ t = "LFS_ANS", id = id, ok = false }, "WHISPER", leader)
+-- why: "busy" (ocupado, ni la ha visto) o "late" (se le acabó el tiempo)
+local function answerNo(id, leader, why)
+    Comm:Send({ t = "LFS_ANS", id = id, ok = false, why = why }, "WHISPER", leader)
 end
 
 -- ¿Estoy para que me molesten? En mazmorra o en combate se pasa al siguiente.
@@ -342,8 +396,9 @@ Comm:Register("LFS_OFFER", function(msg, sender)
     if not SG:Feature("lfs") or not SG:IsGuildMember(sender) then return end
     local d = SG.DungeonById[msg.dg]
     -- un personaje que no es mío, o de una versión con otra lista de mazmorras
-    if not d or not SG.db.my.chars[msg.char] or busy() then
-        answerNo(msg.id, sender)
+    local isBusy = busy()
+    if not d or not SG.db.my.chars[msg.char] or isBusy then
+        answerNo(msg.id, sender, isBusy and "busy" or nil)
         return
     end
     Comm:Send({ t = "LFS_ACK", id = msg.id }, "WHISPER", sender)
@@ -352,13 +407,13 @@ Comm:Register("LFS_OFFER", function(msg, sender)
     SG:Fire("LFS_OFFER_SHOW", offer)
 end)
 
--- La ventana contesta aquí. role = nil: rechaza.
-function LFS:Answer(role)
+-- La ventana contesta aquí. role = nil: rechaza (why = "late": se le ha acabado el tiempo).
+function LFS:Answer(role, why)
     if not offer then return end
     local o = offer
     offer = nil
     if not role then
-        answerNo(o.id, o.from)
+        answerNo(o.id, o.from, why)
         return
     end
     going = { id = o.id, from = o.from, t = GetTime(), char = o.char, dungeon = o.dungeon, wait = true }

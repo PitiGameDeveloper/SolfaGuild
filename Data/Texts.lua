@@ -143,6 +143,12 @@ T.ui = {
     lfsRoleH = "Sanador",
     lfsRoleD = "DPS",
     lfsDpsHint = "Clic izquierdo añade, clic derecho quita",
+    -- cómo va cada persona avisada, en la ventana de búsqueda
+    lfsState = {
+        wait = "pensándoselo", yes = "ha aceptado", relog = "cambiando de personaje", invite = "invitando",
+        inside = "en el grupo", no = "ha rechazado", late = "no ha contestado", busy = "está ocupado",
+        lost = "no le ha llegado", taken = "plaza ya cubierta", failed = "no ha podido entrar",
+    },
     onlineTooltip = "Solfamiders conectados",
     lfsOffer = "Los solfamidas se van de expedición a %dungeon%, necesitan apoyo. Tu personaje %char% les iría perfecto, ¿quieres unirte?",
     lfsLeave = "|cffffd200(si aceptas se te echará del grupo en el que estés)|r",

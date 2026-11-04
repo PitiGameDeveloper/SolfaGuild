@@ -249,6 +249,8 @@ function SG:FormatTime(seconds, withSeconds)
 end
 
 function SG:ClassColor(class)
+    -- en Classic el juego le da el rosa del paladín: siempre azul
+    if class == "SHAMAN" then return "|cff0070dd" end
     local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
     if c then
         return string.format("|cff%02x%02x%02x", c.r * 255, c.g * 255, c.b * 255)

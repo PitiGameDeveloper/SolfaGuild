@@ -56,6 +56,7 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] Quien acepta sale de su grupo y entra **sin pulsar nada más**.
 - [ ] Oferta con un alter: al entrar con él dentro de los 5 min, le invitan solo.
 - [ ] Buscando solo 2 DPS, con dos colegas conectados **fuera de tu grupo**, les salen las dos ofertas a la vez, también justo después de entrar (cuando más perfiles se envían). Quien ya va en tu grupo no recibe oferta.
+- [ ] **Resultado de la búsqueda**: durante la búsqueda se ve cómo va cada persona (pensándoselo, ha aceptado, ha rechazado, no ha contestado, está ocupado, en el grupo) y los textos caben. Al acabar, la ventana enseña "¡Grupo completo!" o "No queda nadie a quien avisar" con lo que falta; si estaba cerrada, se abre sola y suena. "Nueva búsqueda" vuelve al formulario con lo que falta ya marcado.
 - [ ] Los mensajes llegan también si hay restricción de chat (`C_ChatInfo.InChatMessagingLockdown`).
 - [ ] Tamaño de grupo: se asume 5 en todas (`MAX_GROUP`). Una guía dice 10 en Cumbre de Roca Negra Superior.
 - [ ] Funciones por clase (`SG.ClassRoles`, en `Data/Dungeons.lua`): son las de Classic. Ver si alguna clase puede tanquear o curar además.
@@ -81,7 +82,7 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] **Broker** y **Manos callosas**: siguen existiendo `ERR_AUCTION_WON_S`, `LOOT_ITEM_CREATED_SELF` y `LOOT_ITEM_CREATED_SELF_MULTIPLE`.
 - [ ] **Fumeta**: recoger hierbas suma (hechizo 2366, se compara por nombre).
 - [ ] **Camper**: suma en territorio enemigo (`C_PvP.GetZonePVPInfo` o `GetZonePVPInfo`).
-- [ ] **Bunny Hopper**, **Ludópata**, **Ninja**, **Stalker** y **Sobón**: suman (`JumpOrAscendStart`, `RandomRoll`, `RollOnLoot`, `InspectUnit`, `DoEmote`). Si una de esas funciones no existe, la categoría se queda a 0 sin dar error.
+- [ ] **Bunny Hopper**, **Ludópata**, **Ninja**, **Stalker** y **Sobón**: suman (`JumpOrAscendStart`, `RandomRoll`, `RollOnLoot`, `InspectUnit`, `C_ChatInfo.PerformEmote`). `/hug`, `/kiss` y demás arrumacos suman solo una vez cada uno. Si una de esas funciones no existe, la categoría se queda a 0 sin dar error.
 - [ ] Nota musical en los susurros de compañeros y aviso de invitación (`ChatFrameUtil.AddMessageEventFilter`, `StaticPopup_Resize`).
 
 ## 8. Otros

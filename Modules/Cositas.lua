@@ -393,9 +393,15 @@ function Cos:OnLogin()
     hook("InspectUnit", function(unit)
         if unit and UnitIsPlayer(unit) and not UnitIsUnit(unit, "player") then add("inspect") end
     end)
-    hook("DoEmote", function(token)
+    -- el chat usa C_ChatInfo.PerformEmote y DoEmote solo la llama a ella: engancharse a las dos contaría doble
+    local function onEmote(token)
         if type(token) == "string" and CUDDLY[token:upper()] then add("hugs") end
-    end)
+    end
+    if C_ChatInfo and C_ChatInfo.PerformEmote then
+        hooksecurefunc(C_ChatInfo, "PerformEmote", onEmote)
+    else
+        hook("DoEmote", onEmote)
+    end
 
     tick()
     C_Timer.NewTicker(TICK, function() SG:Try(tick) end)

@@ -313,6 +313,9 @@ def t_pvp_ladder():
     check('todos ven lo mismo', rank(c, 'b') == 'Jefe de guerra' and rank(b, 'a') == 'Peón')
     check('sin asesinatos sigue siendo Peón', rank(d, 'd') == 'Peón', rank(d, 'd'))
     check('solo dos rangos', a.ret('#SG.PvP:Ladder(false)') == 2)
+    a.ev('RAID_CLASS_COLORS = { SHAMAN = { r = 0.96, g = 0.55, b = 0.73 }, PALADIN = { r = 0.96, g = 0.55, b = 0.73 } }')
+    check('chamán en azul', a.ret('SG:ClassColor("SHAMAN")') == '|cff0070dd', a.ret('SG:ClassColor("SHAMAN")'))
+    check('paladín con el color del juego', a.ret('SG:ClassColor("PALADIN")') != '|cff0070dd', a.ret('SG:ClassColor("PALADIN")'))
     check('el de PvE no cambia: sin mazmorras, sin rango', a.ret('SG.DungeonTracker:LadderRankOf(SG:MyAccount())') is None)
     no_errors(w, 'escalafón PvP')
 
@@ -612,6 +615,77 @@ def t_lfs_send():
     check('y el mensaje largo sale después', L.ret('SG.Comm:QueueSize()') == 0, L.ret('SG.Comm:QueueSize()'))
     no_errors(w, 'mensajes limitados')
 
+def t_lfs_feedback():
+    print('\n== LFS: se ve quién acepta, quién rechaza y cómo acaba ==')
+    S = 'SolfaGuildLFSSearch'
+    def world():
+        w = World(True)
+        L = w.add('L', {'Lider Uno': {'class': 'WARLOCK', 'level': 20}}, 'Lider Uno')
+        M = w.add('M', {'Mago Dos': {'class': 'MAGE', 'level': 20}}, 'Mago Dos')
+        R = w.add('R', {'Picaro Tres': {'class': 'ROGUE', 'level': 20}}, 'Picaro Tres')
+        w.start()
+        L.ev('SG.UILFS:OpenSearch(SG.DungeonById.vc)')
+        L.ev('for _ = 1, 2 do %s.D:GetScript("OnClick")(%s.D, "LeftButton") end; %s.go:Click()' % (S, S, S))
+        w.run(1)
+        return w, L, M, R
+    def rows(L):
+        out = []
+        for i in range(1, L.ret('#%s.status.rows' % S) + 1):
+            if L.ret('%s.status.rows[%d]:IsShown()' % (S, i)):
+                out.append((L.ret('%s.status.rows[%d].left:GetText()' % (S, i)), L.ret('%s.status.rows[%d].right:GetText()' % (S, i))))
+        return out
+    def state(L, who):
+        return next((r[1] for r in rows(L) if who in (r[0] or '')), '') or ''
+
+    print(' uno rechaza y el otro entra: falta uno')
+    w, L, M, R = world()
+    check('al empezar, se lo están pensando', 'pensándoselo' in state(L, 'Mago Dos') and 'pensándoselo' in state(L, 'Picaro Tres'), rows(L))
+    check('dice lo que falta', 'Faltan: 2 DPS' in rows(L)[0][0], rows(L))
+    no(M)
+    w.run(1)
+    check('se ve quién rechaza', 'ha rechazado' in state(L, 'Mago Dos'), rows(L))
+    check('también en el chat', any('Mago Dos' in p and 'ha rechazado' in p for p in L.prints), L.prints[-2:])
+    L.ev(S + ':Hide()')
+    yes(R)
+    w.run(1)
+    check('ventana cerrada mientras acaba: se abre sola', L.shown(S) or w.run(4) or L.shown(S), L.prints[-3:])
+    check('búsqueda acabada', L.ret('SG.LFS:Run() == nil'))
+    check('el resultado queda a la vista', L.ret(S + '.status:IsShown()') is True and L.ret(S + '.form:IsShown()') is False)
+    check('no queda nadie', 'No queda nadie' in rows(L)[0][0], rows(L))
+    check('falta un DPS', any('Faltan: 1 DPS' in (r[0] or '') for r in rows(L)), rows(L))
+    check('sigue saliendo quién entró y quién no', 'en el grupo' in state(L, 'Picaro Tres') and 'ha rechazado' in state(L, 'Mago Dos'), rows(L))
+    check('el botón ofrece otra búsqueda', L.ret(S + '.go:GetText()') == 'Nueva búsqueda' and L.ret(S + '.go:IsEnabled()') is True)
+    L.ev(S + '.go:Click()')
+    check('vuelve al formulario con lo que falta', L.ret(S + '.form:IsShown()') is True and L.ret(S + '.need.D') == 1 and L.ret(S + '.go:GetText()') == 'Buscar')
+    no_errors(w, 'resultado con plazas sin cubrir')
+
+    print(' los dos entran: grupo completo')
+    w, L, M, R = world()
+    yes(M); yes(R)
+    w.run(5)
+    check('grupo completo', '¡Grupo completo!' in rows(L)[0][0], rows(L))
+    check('sin nada que falte', not any('Faltan' in (r[0] or '') for r in rows(L)), rows(L))
+    check('los dos, en el grupo', 'en el grupo' in state(L, 'Mago Dos') and 'en el grupo' in state(L, 'Picaro Tres'), rows(L))
+    L.ev('SG.UILFS:OpenSearch(SG.DungeonById.rfk)')
+    check('otra tarjeta: formulario limpio', L.ret(S + '.form:IsShown()') is True and L.ret(S + '.need.D') == 0)
+    no_errors(w, 'grupo completo')
+
+    print(' sin contestar y ocupado')
+    w, L, M, R = world()
+    w.run(40)
+    check('sin contestar se ve', 'no ha contestado' in state(L, 'Mago Dos'), rows(L))
+    no_errors(w, 'sin contestar')
+    w, L, M, R = world()
+    L.ev('SG.LFS:Cancel()')
+    w.run(1)
+    check('cancelar: al formulario, sin resultado', L.ret(S + '.form:IsShown()') is True and L.ret('SG.LFS:LastResult() == nil'))
+    M.ev('SG.InCombat = function() return true end')
+    L.ev(S + '.go:Click()')
+    w.run(1)
+    check('en combate: se ve que está ocupado, y a él no le sale', 'está ocupado' in state(L, 'Mago Dos') and not offer(M), rows(L))
+    check('al otro sí', offer(R))
+    no_errors(w, 'cancelar y ocupado')
+
 # ------------------------------------------------------------------ UI
 def t_ui():
     print('\n== Interfaz ==')
@@ -800,6 +874,20 @@ def t_cositas():
     print('\n== Cositas en Forever ==')
     w, a, b, c = base(); w.start()
     stat = lambda k: a.ret('SG:MyChar().cositas.%s or 0' % k)
+    a.ev('C_ChatInfo.PerformEmote("HUG", "")')
+    check('/hug suma en Sobón', stat('hugs') == 1, stat('hugs'))
+    a.ev('C_ChatInfo.PerformEmote("kiss", "Beto")')
+    check('otro arrumaco, también', stat('hugs') == 2, stat('hugs'))
+    a.ev('C_ChatInfo.PerformEmote("DANCE", "")')
+    check('otro emote, no', stat('hugs') == 2, stat('hugs'))
+    a.ev('DoEmote("HUG", "")')
+    check('DoEmote no cuenta doble', stat('hugs') == 3, stat('hugs'))
+    w2 = World(True)
+    v = w2.add('v', {'Viejo Uno': {'class': 'MAGE', 'level': 20}}, 'Viejo Uno')
+    v.ev('C_ChatInfo.PerformEmote = nil; DoEmote = function() end')
+    w2.start(2)
+    v.ev('DoEmote("HUG", "")')
+    check('cliente sin PerformEmote: usa DoEmote', v.ret('SG:MyChar().cositas.hugs') == 1, v.ret('SG:MyChar().cositas.hugs'))
     n = {'g': 0}
     def cast(spell, target, ok=True):
         n['g'] += 1
@@ -918,7 +1006,7 @@ def t_cositas():
     no_errors(w, 'Cositas')
 
 TESTS = [t_cositas, lambda: t_names(0), lambda: t_names(1), lambda: t_names(2), t_migration, t_chars, t_pvp, t_pvp_ladder, t_classic, t_sos,
-         lambda: t_lfs(0), lambda: t_lfs(1), lambda: t_lfs(2), t_lfs_edges, t_lfs_send, t_ui, t_dungeons]
+         lambda: t_lfs(0), lambda: t_lfs(1), lambda: t_lfs(2), t_lfs_edges, t_lfs_send, t_lfs_feedback, t_ui, t_dungeons]
 
 for strict in ('', '1'):
     os.environ['STRICT'] = strict

@@ -261,9 +261,9 @@ local function buildSearch()
     f.why:SetTextColor(1, 0.4, 0.4)
 
     -- estado de la búsqueda
-    f.status = W:List(f, true)
+    f.status = W:List(f)
     f.status:SetPoint("TOPLEFT", 26, -70)
-    f.status:SetPoint("BOTTOMRIGHT", -26, 56)
+    f.status:SetPoint("BOTTOMRIGHT", -44, 56)
 
     f.go = W:Button(f, "Buscar", 130, 24)
     f.go:SetPoint("BOTTOMRIGHT", f, "BOTTOM", -6, 20)
@@ -273,32 +273,76 @@ local function buildSearch()
     return f
 end
 
+-- Orden y color de cada estado: primero quien va, después quien no
+local STATE_ORDER = { inside = 1, invite = 2, yes = 2, relog = 2, wait = 3, no = 4, late = 4, busy = 4, lost = 4, taken = 4, failed = 4 }
+local STATE_COLOR = { inside = "55ff55", invite = "55ff55", yes = "55ff55", relog = "ffd100", wait = "999999" }
+
+-- Una fila por cada persona avisada. slots: plazas en curso, para saber en qué punto van.
+local function answerRows(rows, answers, slots)
+    local list = {}
+    for name, a in pairs(answers) do
+        local state = a.state
+        local s = slots and slots[name]
+        if s and state == "yes" then
+            state = s.ready and "invite" or (s.char ~= name and "relog") or "yes"
+        end
+        list[#list + 1] = { char = a.char or name, class = a.class, role = a.role, state = state }
+    end
+    table.sort(list, function(x, y)
+        local ox, oy = STATE_ORDER[x.state] or 9, STATE_ORDER[y.state] or 9
+        if ox ~= oy then return ox < oy end
+        return x.char < y.char
+    end)
+    for _, a in ipairs(list) do
+        local going = STATE_ORDER[a.state] and STATE_ORDER[a.state] <= 2
+        rows[#rows + 1] = { text = SG:ClassColor(a.class) .. a.char .. "|r" .. (going and a.role and (" - " .. roleName(a.role)) or ""),
+            right = "|cff" .. (STATE_COLOR[a.state] or "ff7777") .. SG.Texts.ui.lfsState[a.state] .. "|r" }
+    end
+end
+
 local function refreshStatus(f)
     local run = SG.LFS:Run()
-    local rows = { { text = "Faltan: " .. run.need.T .. " tanque, " .. run.need.H .. " sanador, " .. run.need.D .. " DPS", header = true } }
-    for name, s in pairs(run.slots) do
-        local who = SG:ClassColor(s.class) .. s.char .. "|r"
-        rows[#rows + 1] = { text = who .. " - " .. roleName(s.role),
-            right = s.ready and "|cff55ff55invitando|r" or "|cffffd100cambiando de personaje|r" }
-    end
-    for name, o in pairs(run.offers) do
-        rows[#rows + 1] = { text = SG:ClassColor(o.class) .. o.char .. "|r", right = "|cff999999pensándoselo|r" }
-    end
+    local missing = SG.LFS:NeedText(run.need)
+    local rows = { { text = missing ~= "" and ("Faltan: " .. missing) or "Plazas cubiertas: esperando a que entren", header = true } }
+    if run.exhausted then rows[#rows + 1] = { text = "|cffff7777No queda nadie más a quien avisar|r" } end
+    answerRows(rows, run.answers, run.slots)
+    f.status:SetRows(rows)
+end
+
+-- Cómo ha acabado: se queda a la vista hasta que se empieza otra
+local function refreshResult(f, last)
+    local missing = SG.LFS:NeedText(last.need)
+    local rows = { { text = "|cff" .. (last.complete and "55ff55" or "ff7777") .. last.text .. "|r", header = true } }
+    if missing ~= "" then rows[#rows + 1] = { text = "Faltan: " .. missing } end
+    answerRows(rows, last.answers)
     f.status:SetRows(rows)
 end
 
 local function refreshSearch()
     local f = search
     if not f or not f:IsShown() then return end
-    local run = SG.LFS:Run()
-    f.form:SetShown(not run)
-    f.status:SetShown(run ~= nil)
+    local run, last = SG.LFS:Run(), SG.LFS:LastResult()
+    f.form:SetShown(not run and not last)
+    f.status:SetShown(run ~= nil or last ~= nil)
     if run then
         f.dungeon:SetText("|cffffd100" .. run.d.name .. "|r")
         f.go:SetText("Cancelar búsqueda")
         f.go:Enable()
         f.go:SetScript("OnClick", function() SG.LFS:Cancel() end)
         refreshStatus(f)
+    elseif last then
+        f.dungeon:SetText("|cffffd100" .. last.d.name .. "|r")
+        f.go:SetText("Nueva búsqueda")
+        f.go:Enable()
+        f.go:SetScript("OnClick", function()
+            -- ya marcado lo que ha faltado
+            f.d = last.d
+            f.need = { T = last.need.T, H = last.need.H, D = math.min(last.need.D, MAX_DPS) }
+            f.why:SetText("")
+            SG.LFS:ClearResult()
+            refreshSearch()
+        end)
+        refreshResult(f, last)
     else
         local d = f.d
         f.dungeon:SetText(d and ("|cffffd100" .. d.name .. "|r") or "")
@@ -316,6 +360,7 @@ end
 function UILFS:OpenSearch(d)
     search = search or buildSearch()
     if not SG.LFS:Run() then
+        SG.LFS:ClearResult()
         search.d = d
         search.need = { T = 0, H = 0, D = 0 }
         search.why:SetText("")
@@ -325,6 +370,16 @@ function UILFS:OpenSearch(d)
 end
 
 SG:Listen("LFS_CHANGED", refreshSearch)
+
+-- Ha acabado: se avisa aunque hubieran cerrado la ventana
+SG:Listen("LFS_FINISHED", function()
+    if not search then return end
+    search:Show()
+    refreshSearch()
+    local last = SG.LFS:LastResult()
+    local sound = SOUNDKIT and (last and last.complete and SOUNDKIT.READY_CHECK or SOUNDKIT.RAID_WARNING)
+    if sound then pcall(PlaySound, sound) end
+end)
 
 ---------------------------------------------------------------------------
 -- La oferta. Un botón de radio por función; si solo hay una, ya sale marcada.
@@ -418,7 +473,7 @@ local function showOffer(o)
     C_Timer.After(o.secs or 30, function()
         if f.token == token and f:IsShown() then
             f:Hide()
-            if not o.test then SG.LFS:Answer(nil) end
+            if not o.test then SG.LFS:Answer(nil, "late") end
         end
     end)
     f:Show()
