@@ -17,7 +17,7 @@ local T = SG.Texts
 T.pvpRanks = {
     { at = 1,    name = "Primera Sangre",            icon = "Interface\\Icons\\Ability_Rogue_Eviscerate",
       title = "¡Has derramado sangre %enemy%!",
-      text  = "Por primera vez, la sangre de la %enemy% mancha tus manos. No será la última.\n\nHoy comienza tu camino, %name%. Los tambores de los Solfamidas ya suenan con tu nombre... y algún día sonarán como una leyenda.",
+      text  = "Por primera vez, la sangre de la %enemy% mancha tus manos. No será la última.\n\nHoy comienza tu camino, %name%. Las flautas de los Solfamidas ya suenan con tu nombre... y algún día sonarán como una leyenda.",
       button = "Ver PvP", tab = "pvp" },
     { at = 5,    name = "Recluta de la Horda" },
     { at = 10,   name = "Grunt Solfamida" },
@@ -36,7 +36,9 @@ T.pvpRanks = {
 -- también entra quien aún no tiene ninguno.
 ---------------------------------------------------------------------------
 T.pvpLadder = {
-    { name = "Jefe de guerra", players = 1 },
+    { name = "Señor de la guerra", players = 1 },
+    { name = "Machamédulas",       players = 3 },
+    { name = "Aplastacanillas",    players = 10 },
     { name = "Peón", zero = true },
 }
 
@@ -44,11 +46,10 @@ T.pvpLadder = {
 -- ESCALAFÓN PVE de la pestaña PvE: igual que el de PvP, por mazmorras completadas.
 ---------------------------------------------------------------------------
 T.pveLadder = {
-    { name = "Leyenda de las Profundidades", players = 1 },
-    { name = "Señores de las Criptas",       players = 3 },
-    { name = "Rompemazmorras",               players = 5 },
-    { name = "Veteranos",                    players = 10 },
-    { name = "Exploradores" },
+    { name = "Matatitanes",  players = 1 },
+    { name = "Elementalista", players = 3 },
+    { name = "Abresendas",   players = 10 },
+    { name = "Peón", zero = true },
 }
 
 ---------------------------------------------------------------------------

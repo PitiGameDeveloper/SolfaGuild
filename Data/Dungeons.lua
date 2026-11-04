@@ -47,9 +47,6 @@ SG.Dungeons = {
     { id = "scholo", name = "Scholomance", en = "Scholomance", min = 58, max = 60, bosses = { 1853 }, color = { 0.24, 0.18, 0.30 } },
 }
 
--- PRUEBA TEMPORAL: todas las mazmorras a nivel 1. Quitar este bloque para volver a los niveles reales.
-for _, d in ipairs(SG.Dungeons) do d.min = 1 end
-
 -- Imagen de cada tarjeta: pantalla de carga del juego, por su identificador de archivo
 -- (los mismos que usa Attune en Forever). Las mazmorras nuevas de Forever que no están
 -- aquí no tienen identificador conocido y se quedan con su color.

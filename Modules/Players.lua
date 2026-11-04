@@ -260,7 +260,11 @@ function SG:Ranking(valueFn)
         -- los demás solo salen si tienen algo; tú siempre, para que veas dónde estás
         if v and (v > 0 or acc.mine) then out[#out + 1] = { acc = acc, value = v or 0 } end
     end
-    table.sort(out, function(a, b) return a.value > b.value end)
+    -- si empatan, por nombre: así todos ven el mismo orden y los mismos rangos
+    table.sort(out, function(a, b)
+        if a.value ~= b.value then return a.value > b.value end
+        return (a.acc.main or "") < (b.acc.main or "")
+    end)
     return out
 end
 

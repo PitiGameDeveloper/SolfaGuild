@@ -298,7 +298,7 @@ def t_pvp():
     no_errors(w, 'PvP debug')
 
 def t_pvp_ladder():
-    print('\n== Escalafón PvP: Jefe de guerra y Peón ==')
+    print('\n== Escalafones PvP y PvE ==')
     w = World(True)
     cs = [w.add(k, {n: {'class': 'MAGE', 'level': 20}}, n) for k, n in (('a', 'Ana Uno'), ('b', 'Beto Dos'), ('c', 'Cati Tres'), ('d', 'Dani Cuatro'))]
     a, b, c, d = cs
@@ -308,15 +308,29 @@ def t_pvp_ladder():
     for cl, kills in ((a, 3), (b, 10), (c, 1)):
         cl.ev('SG:MyChar().kills = %d; SG:BroadcastProfile()' % kills)
     w.run(5)
-    check('el que más tiene, Jefe de guerra', rank(a, 'b') == 'Jefe de guerra', rank(a, 'b'))
-    check('el resto, Peón', rank(a, 'a') == 'Peón' and rank(a, 'c') == 'Peón', (rank(a, 'a'), rank(a, 'c')))
-    check('todos ven lo mismo', rank(c, 'b') == 'Jefe de guerra' and rank(b, 'a') == 'Peón')
+    check('el que más tiene, Señor de la guerra', rank(a, 'b') == 'Señor de la guerra', rank(a, 'b'))
+    check('los siguientes, Machamédulas', rank(a, 'a') == 'Machamédulas' and rank(a, 'c') == 'Machamédulas', (rank(a, 'a'), rank(a, 'c')))
+    check('todos ven lo mismo', rank(c, 'b') == 'Señor de la guerra' and rank(b, 'a') == 'Machamédulas')
     check('sin asesinatos sigue siendo Peón', rank(d, 'd') == 'Peón', rank(d, 'd'))
-    check('solo dos rangos', a.ret('#SG.PvP:Ladder(false)') == 2)
+    check('ordenados de más a menos', a.ret('SG.PvP:Ladder(false)[2].members[1].value') == 3 and a.ret('SG.PvP:Ladder(false)[2].members[2].value') == 1)
+    a.rt.execute('''
+        function __tiers(tiers, n)
+            local list, s = {}, {}
+            for i = 1, n do list[i] = { acc = { id = i }, value = 100 - i } end
+            for _, t in ipairs(SG:BuildLadder(list, tiers)) do s[#s + 1] = t.name .. ":" .. #t.members end
+            return table.concat(s, ",")
+        end
+    ''')
+    check('PvP: 1, 3, 10 y el resto', a.ret('__tiers(SG.Texts.pvpLadder, 16)') == 'Señor de la guerra:1,Machamédulas:3,Aplastacanillas:10,Peón:2', a.ret('__tiers(SG.Texts.pvpLadder, 16)'))
+    check('PvE: 1, 3, 10 y el resto', a.ret('__tiers(SG.Texts.pveLadder, 16)') == 'Matatitanes:1,Elementalista:3,Abresendas:10,Peón:2', a.ret('__tiers(SG.Texts.pveLadder, 16)'))
+    for cl in (a, b):
+        cl.ev('SG:MyChar().kills = 10; SG:BroadcastProfile()')
+    w.run(5)
+    check('empate: gana por nombre, en todos los clientes', [rank(x, 'a') for x in (a, b, c)] == ['Señor de la guerra'] * 3, [rank(x, 'a') for x in (a, b, c)])
     a.ev('RAID_CLASS_COLORS = { SHAMAN = { r = 0.96, g = 0.55, b = 0.73 }, PALADIN = { r = 0.96, g = 0.55, b = 0.73 } }')
     check('chamán en azul', a.ret('SG:ClassColor("SHAMAN")') == '|cff0070dd', a.ret('SG:ClassColor("SHAMAN")'))
     check('paladín con el color del juego', a.ret('SG:ClassColor("PALADIN")') != '|cff0070dd', a.ret('SG:ClassColor("PALADIN")'))
-    check('el de PvE no cambia: sin mazmorras, sin rango', a.ret('SG.DungeonTracker:LadderRankOf(SG:MyAccount())') is None)
+    check('PvE sin mazmorras: Peón', a.ret('SG.DungeonTracker:LadderRankOf(SG:MyAccount())') == 'Peón')
     no_errors(w, 'escalafón PvP')
 
 # ------------------------------------------------------------------ Classic
@@ -791,7 +805,7 @@ def t_ui():
     check('Ana reconoce al GM', a.ret('SG.gmName') == 'Beto Dos', a.ret('SG.gmName'))
     check('Ana no es admin', a.ret('SG:IsAdmin()') is False)
     r = a.ret('SG.DungeonTracker:LadderRankOf(SG:MyAccount())')
-    check('Ana tiene rango PvE', r == 'Leyenda de las Profundidades' or r is not None, r)
+    check('Ana tiene rango PvE', r is not None, r)
     no_errors(w, 'interfaz')
     print(' LFS con un personaje que aún no llega a ninguna mazmorra')
     w = World(True)
