@@ -271,7 +271,7 @@ function SG:BuildLadder(list, tiers)
     local out, idx = {}, 1
     for _, tier in ipairs(tiers) do
         local members = {}
-        while list[idx] and list[idx].value > 0 and (not tier.players or #members < tier.players) do
+        while list[idx] and (list[idx].value > 0 or tier.zero) and (not tier.players or #members < tier.players) do
             members[#members + 1] = list[idx]
             idx = idx + 1
         end

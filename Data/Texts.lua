@@ -46,14 +46,12 @@ T.pvpRanks = {
 ---------------------------------------------------------------------------
 -- ESCALAFÓN PVP de la pestaña PvP: los jugadores se ordenan por asesinatos y
 -- van llenando los rangos de arriba abajo. "players" = cuántos caben en ese
--- rango; el último (sin "players") se queda con todos los que sobren.
+-- rango; el último (sin "players") se queda con todos los que sobren. zero = true:
+-- también entra quien aún no tiene ninguno.
 ---------------------------------------------------------------------------
 T.pvpLadder = {
-    { name = "Señor de la Guerra", players = 1 },
-    { name = "Campeones",          players = 3 },
-    { name = "Veteranos",          players = 5 },
-    { name = "Grunts",             players = 10 },
-    { name = "Reclutas" },
+    { name = "Jefe de guerra", players = 1 },
+    { name = "Peón", zero = true },
 }
 
 ---------------------------------------------------------------------------

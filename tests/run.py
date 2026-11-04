@@ -297,6 +297,25 @@ def t_pvp():
     check('rango del escalafón', a.ret('SG.PvP:LadderRankOf(SG:MyAccount())') is not None)
     no_errors(w, 'PvP debug')
 
+def t_pvp_ladder():
+    print('\n== Escalafón PvP: Jefe de guerra y Peón ==')
+    w = World(True)
+    cs = [w.add(k, {n: {'class': 'MAGE', 'level': 20}}, n) for k, n in (('a', 'Ana Uno'), ('b', 'Beto Dos'), ('c', 'Cati Tres'), ('d', 'Dani Cuatro'))]
+    a, b, c, d = cs
+    w.start(12)
+    rank = lambda who, acc: who.ret('SG.PvP:LadderRankOf(SG:Accounts().%s)' % acc)
+    check('sin asesinatos: Peón', rank(a, 'a') == 'Peón', rank(a, 'a'))
+    for cl, kills in ((a, 3), (b, 10), (c, 1)):
+        cl.ev('SG:MyChar().kills = %d; SG:BroadcastProfile()' % kills)
+    w.run(5)
+    check('el que más tiene, Jefe de guerra', rank(a, 'b') == 'Jefe de guerra', rank(a, 'b'))
+    check('el resto, Peón', rank(a, 'a') == 'Peón' and rank(a, 'c') == 'Peón', (rank(a, 'a'), rank(a, 'c')))
+    check('todos ven lo mismo', rank(c, 'b') == 'Jefe de guerra' and rank(b, 'a') == 'Peón')
+    check('sin asesinatos sigue siendo Peón', rank(d, 'd') == 'Peón', rank(d, 'd'))
+    check('solo dos rangos', a.ret('#SG.PvP:Ladder(false)') == 2)
+    check('el de PvE no cambia: sin mazmorras, sin rango', a.ret('SG.DungeonTracker:LadderRankOf(SG:MyAccount())') is None)
+    no_errors(w, 'escalafón PvP')
+
 # ------------------------------------------------------------------ Classic
 def t_classic():
     print('\n== Classic Era sigue con el registro de combate ==')
@@ -898,7 +917,7 @@ def t_cositas():
     check('tras reiniciar el medidor sigue sumando', stat('heal') == 990, stat('heal'))
     no_errors(w, 'Cositas')
 
-TESTS = [t_cositas, lambda: t_names(0), lambda: t_names(1), lambda: t_names(2), t_migration, t_chars, t_pvp, t_classic, t_sos,
+TESTS = [t_cositas, lambda: t_names(0), lambda: t_names(1), lambda: t_names(2), t_migration, t_chars, t_pvp, t_pvp_ladder, t_classic, t_sos,
          lambda: t_lfs(0), lambda: t_lfs(1), lambda: t_lfs(2), t_lfs_edges, t_lfs_send, t_ui, t_dungeons]
 
 for strict in ('', '1'):
