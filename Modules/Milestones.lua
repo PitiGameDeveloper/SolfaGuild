@@ -21,26 +21,34 @@ function M:RankName(list, value)
     return SG:Fmt(list[i].name)
 end
 
+-- Enseña la carta de un hito. Si trae tab, su botón abre esa pestaña del addon.
+function M:ShowCard(r, kicker, vars)
+    SG.Popup:Card({
+        kicker = kicker,
+        icon = r.icon,
+        title = SG:Fmt(r.title, vars),
+        rank = SG:Fmt(r.name, vars),
+        text = SG:Fmt(r.text, vars),
+        button = r.button,
+        onClose = r.tab and function() SG:Try(SG.UI.Show, SG.UI, r.tab) end,
+    })
+end
+
 -- Comprueba un valor contra una lista de hitos y lanza las cartas pendientes.
--- key: prefijo único ("pvp", "goldE", "goldH", "dung"). formatCount: fn(at) -> texto
+-- Los hitos sin title no avisan.
+-- key: prefijo único ("pvp", "goldE", "goldH"). formatCount: fn(at) -> texto
 function M:Check(key, list, value, kicker, vars, formatCount)
     -- mientras se recuperan los datos de la guild no sabemos qué hitos ya se celebraron
     if SG.restoring then return end
     local done = SG.db.my.milestones
     for i, r in ipairs(list) do
         local k = key .. ":" .. r.at
-        if value >= r.at and not done[k] then
+        if r.title and value >= r.at and not done[k] then
             done[k] = SG:Now()
             local v = {}
             for a, b in pairs(vars or {}) do v[a] = b end
             v.count = formatCount and formatCount(value) or value
-            SG.Popup:Card({
-                kicker = kicker,
-                icon = r.icon,
-                title = SG:Fmt(r.title, v),
-                rank = SG:Fmt(r.name, v),
-                text = SG:Fmt(r.text, v),
-            })
+            self:ShowCard(r, kicker, v)
             SG:MarkDirty()
         end
     end

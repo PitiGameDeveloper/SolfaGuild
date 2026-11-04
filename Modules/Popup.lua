@@ -183,10 +183,5 @@ function Popup:PickList(data)
 end
 
 SG:Listen("TEST_POPUP", function()
-    local r = SG.Texts.pvpRanks[1]
-    Popup:Card({
-        kicker = "RANGO PVP DESBLOQUEADO",
-        icon = r.icon, title = SG:Fmt(r.title), rank = SG:Fmt(r.name),
-        text = SG:Fmt(r.text, { count = 1 }),
-    })
+    SG.Milestones:ShowCard(SG.Texts.pvpRanks[1], "RANGO PVP DESBLOQUEADO", { count = 1 })
 end)

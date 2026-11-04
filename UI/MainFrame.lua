@@ -437,7 +437,7 @@ end
 ---------------------------------------------------------------------------
 local FEATURE_NAMES = {
     { "pvp", "Rangos PvP" }, { "gold", "Hitos de oro" },
-    { "dungeons", "Hitos de mazmorras" }, { "lfs", "LFS" },
+    { "dungeons", "Aviso de primera mazmorra" }, { "lfs", "LFS" },
     { "cositas", "Cositas" },
     { "whisperIcon", "Nota musical en susurros" }, { "inviteIcon", "Aviso de invitaciones" },
     { "zoneNotify", "Aviso de zona" }, { "events", "Eventos" }, { "campSOS", "SOS por campeo" },

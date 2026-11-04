@@ -27,6 +27,7 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] Un nivel 60 que mata a un nivel 20 no suma.
 - [ ] Un nivel 60 ayudando a un nivel 20: al 60 no le cuenta, y no sale como asesinato en grupo. Ver si al 20 le cuenta o no (lo decide el juego).
 - [ ] La kill suma en su zona, en el escalafón total y en el semanal.
+- [ ] La primera kill de la cuenta saca la carta, y su botón **Ver PvP** abre el addon en la pestaña PvP. Las siguientes no sacan nada. El texto cabe en la carta.
 
 ## 3. Asesinatos en grupo
 - [ ] **Clave**: dos jugadores en la misma pelea ven con `/sg debug` el **mismo identificador** (`Muerte honorable. Identificador: Player-...`).
@@ -63,6 +64,7 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 
 ## 6. Mazmorras (`Data/Dungeons.lua`)
 - [ ] Al morir el jefe final dentro, la mazmorra cuenta **una vez** (`UNIT_DIED`, `PARTY_KILL`; `IsInInstance()` debe devolver `party` o `raid`).
+- [ ] **Aviso de primera mazmorra**: al subir al nivel de la primera mazmorra (el `min` más bajo de `Data/Dungeons.lua`, ahora 13) sale la carta con su título entero en la ventana (`PLAYER_LEVEL_UP` debe dar el nivel), y **Ver PvE** abre la pestaña PvE. Comprobar que ese nivel es de verdad el mínimo para entrar.
 - [ ] **Mazmorras más completadas y grupos**: los Solfamidas que van juntos suman **una** completación y salen como grupo; por separado, una cada uno. Comprobar que dentro de la instancia el juego da los nombres del grupo (`UnitName`, sin valores ocultos); si no, cuentan por separado. Quien está en el grupo pero fuera de la instancia también sale en el grupo.
 - [ ] **Niveles**: las guías no coinciden. Las 6 de la captura van con sus niveles y las demás con los de AtlasLootClassic y NeedRoll. Se usa un solo rango; el nivel real para entrar suele ser menor.
 - [ ] **Jefes sin NPC ID** (aún no se marcan como completadas): Bastión de Krol'dok, Prisión de Alcaz (Blazeroar), Fuerte Faucenegra y La Terraza del Creador (Nanaya).

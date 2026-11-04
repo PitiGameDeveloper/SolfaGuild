@@ -11,36 +11,22 @@ SG.Texts = {}
 local T = SG.Texts
 
 ---------------------------------------------------------------------------
--- RANGOS PVP (asesinatos de jugadores enemigos en mundo abierto)
+-- RANGOS PVP (asesinatos de jugadores enemigos en mundo abierto). Solo avisa el
+-- primero; los demás sirven para los filtros de los eventos.
 ---------------------------------------------------------------------------
 T.pvpRanks = {
     { at = 1,    name = "Primera Sangre",            icon = "Interface\\Icons\\Ability_Rogue_Eviscerate",
       title = "¡Has derramado sangre %enemy%!",
-      text  = "Por primera vez, la sangre de la %enemy% mancha tus manos. No será la última.\n\nHoy comienza tu camino, %name%. Los tambores de los Solfamidas ya suenan con tu nombre... y algún día sonarán como una leyenda." },
-    { at = 5,    name = "Recluta de la Horda",       icon = "Interface\\Icons\\INV_Sword_04",
-      title = "Recluta de la Horda",
-      text  = "%count% enemigos han caído ante ti. Ya no eres un simple peón: eres un Recluta." },
-    { at = 10,   name = "Grunt Solfamida",           icon = "Interface\\Icons\\INV_Axe_02",
-      title = "Grunt Solfamida",
-      text  = "%count% muertes. Tu hacha empieza a tener fama en las tabernas enemigas." },
-    { at = 25,   name = "Sargento",                  icon = "Interface\\Icons\\INV_Shield_05",
-      title = "Sargento",
-      text  = "%count% enemigos. Los guardias de la %enemy% ya tienen un cartel con tu cara." },
-    { at = 50,   name = "Cazador de la %enemy%",     icon = "Interface\\Icons\\Ability_Hunter_SniperShot",
-      title = "Cazador",
-      text  = "%count% presas. Cazas a la %enemy% como quien caza jabalíes en Durotar." },
-    { at = 100,  name = "Centurión",                 icon = "Interface\\Icons\\INV_Helmet_03",
-      title = "Centurión",
-      text  = "¡CIEN! %count% enemigos. Thrall en persona ha oído hablar de ti." },
-    { at = 250,  name = "Señor de la Guerra",        icon = "Interface\\Icons\\INV_Sword_48",
-      title = "Señor de la Guerra",
-      text  = "%count% almas enviadas al cementerio. Las madres de la %enemy% asustan a sus hijos con tu nombre." },
-    { at = 500,  name = "Azote de la %enemy%",       icon = "Interface\\Icons\\Spell_Shadow_DeathScream",
-      title = "Azote",
-      text  = "%count%. Ya no es una guerra, es una costumbre." },
-    { at = 1000, name = "Leyenda Solfamida",         icon = "Interface\\Icons\\INV_Misc_Head_Dragon_01",
-      title = "LEYENDA",
-      text  = "%count% enemigos. Lo prometimos el primer día: te has convertido en leyenda. Los Solfamidas cantarán tu nombre para siempre." },
+      text  = "Por primera vez, la sangre de la %enemy% mancha tus manos. No será la última.\n\nHoy comienza tu camino, %name%. Los tambores de los Solfamidas ya suenan con tu nombre... y algún día sonarán como una leyenda.",
+      button = "Ver PvP", tab = "pvp" },
+    { at = 5,    name = "Recluta de la Horda" },
+    { at = 10,   name = "Grunt Solfamida" },
+    { at = 25,   name = "Sargento" },
+    { at = 50,   name = "Cazador de la %enemy%" },
+    { at = 100,  name = "Centurión" },
+    { at = 250,  name = "Señor de la Guerra" },
+    { at = 500,  name = "Azote de la %enemy%" },
+    { at = 1000, name = "Leyenda Solfamida" },
 }
 
 ---------------------------------------------------------------------------
@@ -80,21 +66,23 @@ T.goldEarned = {
 }
 
 ---------------------------------------------------------------------------
--- MAZMORRAS completadas (jefe final)
+-- MAZMORRAS completadas (jefe final). No avisan: sirven para los filtros de los eventos.
 ---------------------------------------------------------------------------
 T.dungeonRanks = {
-    { at = 1,   name = "Explorador",        icon = "Interface\\Icons\\INV_Misc_Map_01",
-      title = "¡Tu primera mazmorra!", text = "Has completado %dungeon%. La primera de muchas, %name%." },
-    { at = 5,   name = "Saqueador",         icon = "Interface\\Icons\\INV_Misc_Bag_08",
-      title = "5 mazmorras", text = "%count% mazmorras completadas. Ya sabes quién tira de más." },
-    { at = 10,  name = "Veterano",          icon = "Interface\\Icons\\INV_Shield_06",
-      title = "10 mazmorras", text = "%count% mazmorras. El tanque te pide que no corras." },
-    { at = 25,  name = "Rompemazmorras",    icon = "Interface\\Icons\\INV_Hammer_05",
-      title = "25 mazmorras", text = "%count%. Los jefes finales tiemblan cuando entras." },
-    { at = 50,  name = "Señor de las Criptas", icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01",
-      title = "50 mazmorras", text = "%count% mazmorras. Tu casa es una mazmorra." },
-    { at = 100, name = "Leyenda de las Profundidades", icon = "Interface\\Icons\\INV_Misc_Head_Dragon_Black",
-      title = "¡100 mazmorras!", text = "%count%. Los Solfamidas componen canciones sobre tus runs." },
+    { at = 1,   name = "Explorador" },
+    { at = 5,   name = "Saqueador" },
+    { at = 10,  name = "Veterano" },
+    { at = 25,  name = "Rompemazmorras" },
+    { at = 50,  name = "Señor de las Criptas" },
+    { at = 100, name = "Leyenda de las Profundidades" },
+}
+
+-- Aviso al llegar al nivel de la primera mazmorra (%level% = nivel, %dungeon% = cuáles)
+T.firstDungeon = {
+    name = "Nivel %level%", icon = "Interface\\Icons\\INV_Misc_Map_01",
+    title = "¡Ya puedes entrar en tu primera mazmorra!",
+    text = "%name%, ya tienes nivel para %dungeon%. Busca Solfamidas y a por ella.",
+    button = "Ver PvE", tab = "dungeons",
 }
 
 ---------------------------------------------------------------------------

@@ -814,6 +814,72 @@ def t_ui():
     check('con los iconos del LFG: se encienden', c.ret(S + '.T.glow:IsShown()') is True)
     no_errors(w, 'LFS a nivel bajo')
 
+def card_shown(c):
+    return bool(c.ret('SolfaGuildCard ~= nil and SolfaGuildCard:IsShown()'))
+
+def click_card(c):
+    """Pulsa el botón de la carta y devuelve la pestaña que abre."""
+    c.ev('__tab = nil; local o = SG.UI.Show; SG.UI.Show = function(s, k) __tab = k; SG.UI.Show = o; return o(s, k) end')
+    c.ev('SolfaGuildCard.button:Click()')
+    return c.ret('__tab')
+
+def t_cards():
+    print('\n== Cartas de PvP y mazmorras ==')
+    w, a, b, c = base(); w.start()
+    check('sin kills, ninguna carta', not card_shown(a))
+    hk(a); w.run(2)
+    check('la primera kill saca la carta', card_shown(a))
+    check('es la de la primera sangre', 'sangre' in (a.ret('SolfaGuildCard.title:GetText()') or ''), a.ret('SolfaGuildCard.title:GetText()'))
+    check('el botón dice Ver PvP', a.ret('SolfaGuildCard.button:GetText()') == 'Ver PvP')
+    check('el botón lleva a la pestaña PvP', click_card(a) == 'pvp')
+    check('se abre la ventana', a.ret('SolfaGuildFrame:IsShown()') is True)
+    check('la carta se cierra', not card_shown(a))
+    for _ in range(5):
+        hk(a); w.run(2)
+    check('las demás kills cuentan', kills(a) == 6, kills(a))
+    check('pero no sacan carta', not card_shown(a))
+
+    a.ev('SG:MyChar().dungeons.vc = 1')
+    a.ev('SG.DungeonTracker:Complete(SG.DungeonById.rfc)')
+    w.run(1)
+    check('completar una mazmorra no saca carta', not card_shown(a))
+    check('ni dice nada en el chat', not [p for p in a.prints if 'Mazmorra completada' in p])
+
+    print(' nivel de la primera mazmorra')
+    def fresh(level, **extra):
+        w = World(True)
+        x = w.add('x', {'Ana Uno': dict({'class': 'MAGE', 'level': level}, **extra)}, 'Ana Uno')
+        w.start()
+        return w, x
+    def level_up(w, x, n):
+        x.fire('PLAYER_LEVEL_UP', n); w.run(1)
+    first = a.ret('(function() local m = 99 for _, d in ipairs(SG.Dungeons) do m = math.min(m, d.min) end return m end)()')
+    w, x = fresh(first - 2)
+    level_up(w, x, first - 1)
+    check('un nivel antes no avisa', not card_shown(x))
+    level_up(w, x, first)
+    check('al llegar sale la carta', card_shown(x))
+    check('nombra el nivel', x.ret('SolfaGuildCard.rank:GetText()') == 'Nivel %d' % first, x.ret('SolfaGuildCard.rank:GetText()'))
+    check('nombra la mazmorra', 'Sima Ígnea' in (x.ret('SolfaGuildCard.text:GetText()') or ''), x.ret('SolfaGuildCard.text:GetText()'))
+    check('el botón dice Ver PvE', x.ret('SolfaGuildCard.button:GetText()') == 'Ver PvE')
+    check('el botón lleva a la pestaña PvE', click_card(x) == 'dungeons')
+    level_up(w, x, first + 1)
+    check('el nivel siguiente no avisa', not card_shown(x))
+    x.ev('SG.db.my.milestones.firstDungeon = nil')
+    x.ev('SG:MyChar().level = %d' % (first + 1))
+    level_up(w, x, first + 2)
+    check('quien ya lo pasó no recibe aviso', not card_shown(x))
+    no_errors(w, 'primera mazmorra')
+
+    print(' un alter de quien ya tiene un personaje más alto')
+    w = World(True)
+    x = w.add('x', {'Ana Uno': {'class': 'MAGE', 'level': first - 1}, 'Ana Alta': {'class': 'ROGUE', 'level': 40}}, 'Ana Uno')
+    w.start()
+    x.ev('SG.db.my.chars["Ana Alta"] = SG.db.my.chars["Ana Alta"] or {}; SG.db.my.chars["Ana Alta"].level = 40')
+    level_up(w, x, first)
+    check('no recibe el aviso', not card_shown(x))
+    no_errors(w, 'alter')
+
 def t_dungeons():
     print('\n== Mazmorra completada en Forever ==')
     w, a, b, c = base(); w.start()
@@ -1118,7 +1184,7 @@ def t_cositas():
     no_errors(w, 'Cositas')
 
 TESTS = [t_cositas, lambda: t_names(0), lambda: t_names(1), lambda: t_names(2), t_migration, t_chars, t_pvp, t_pvp_ladder, t_classic, t_sos,
-         lambda: t_lfs(0), lambda: t_lfs(1), lambda: t_lfs(2), t_lfs_edges, t_lfs_send, t_lfs_feedback, t_ui, t_dungeons]
+         lambda: t_lfs(0), lambda: t_lfs(1), lambda: t_lfs(2), t_lfs_edges, t_lfs_send, t_lfs_feedback, t_ui, t_dungeons, t_cards]
 
 for strict in ('', '1'):
     os.environ['STRICT'] = strict

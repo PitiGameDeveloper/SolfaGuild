@@ -60,12 +60,28 @@ function D:Complete(d)
         c.dgTeamsWeek[key] = (c.dgTeamsWeek[key] or 0) + 1
     end
     SG:MarkDirty()
-    SG:Print("Mazmorra completada: |cffffd100" .. d.name .. "|r")
     SG:Fire("DUNGEON_DONE", d)
-    if not SG:Feature("dungeons") then return end
-    local total = SG.Milestones:MyTotals().dungeons
-    SG.Milestones:Check("dung", SG.Texts.dungeonRanks, total, "HITO DE MAZMORRAS", { dungeon = d.name })
 end
+
+-- Al llegar al nivel de la primera mazmorra se avisa una vez por cuenta: un alter
+-- de quien ya ha subido a otro por encima no estrena nada.
+SG:On("PLAYER_LEVEL_UP", function(level)
+    if SG.restoring or not SG:Feature("dungeons") then return end
+    local done = SG.db.my.milestones
+    if done.firstDungeon then return end
+    local first, names = math.huge, {}
+    for _, d in ipairs(SG.Dungeons) do
+        if d.min < first then first, names = d.min, { d.name }
+        elseif d.min == first then names[#names + 1] = d.name end
+    end
+    if level ~= first then return end
+    for _, c in pairs(SG.db.my.chars) do
+        if (tonumber(c.level) or 0) > level then return end
+    end
+    done.firstDungeon = SG:Now()
+    SG.Milestones:ShowCard(SG.Texts.firstDungeon, "LOS SOLFAMIDAS", { level = level, dungeon = table.concat(names, " o ") })
+    SG:MarkDirty()
+end)
 
 local function onDeath(guid)
     -- en Forever algunos valores pueden venir ocultos: con esos no se puede operar
