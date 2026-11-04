@@ -49,8 +49,8 @@ local function buildCard(parent)
     b.name:SetPoint("TOPLEFT", 10, -10)
     b.name:SetPoint("RIGHT", -66, 0)
     b.name:SetJustifyH("LEFT"); b.name:SetWordWrap(false)
-    b.count = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    b.count:SetPoint("TOPRIGHT", -10, -11)
+    b.lock = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    b.lock:SetPoint("TOPRIGHT", -10, -11)
     b.level = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     b.level:SetPoint("BOTTOMLEFT", 10, 9)
     b.tick = b:CreateTexture(nil, "OVERLAY")
@@ -64,7 +64,7 @@ local function buildCard(parent)
     return b
 end
 
-local function fillCard(b, d, myLevel, accounts)
+local function fillCard(b, d, myLevel)
     local locked = myLevel < d.min
     local c = d.color or { 0.25, 0.25, 0.25 }
     b.base:SetColorTexture(c[1], c[2], c[3], 1)
@@ -83,12 +83,7 @@ local function fillCard(b, d, myLevel, accounts)
     b.name:SetText(d.name)
     b.level:SetText("Nivel " .. d.min .. " - " .. d.max)
     b.tick:SetShown((SG:MyChar().dungeons[d.id] or 0) > 0)
-    if locked then
-        b.count:SetText("|cffff7777Nivel " .. d.min .. "|r")
-    else
-        local n = SG.LFS:CountFor(d, accounts)
-        b.count:SetText(n .. (n == 1 and " compi" or " compis"))
-    end
+    b.lock:SetText(locked and ("|cffff7777Nivel " .. d.min .. "|r") or "")
     b:SetScript("OnClick", function() UILFS:OpenSearch(d) end)
 end
 
@@ -122,7 +117,6 @@ function UILFS:BuildPanel(parent)
         local width = self.scroll:GetWidth()
         if width < 50 then return end
         local level = UnitLevel("player")
-        local accounts = SG:Accounts()
         local cardW = (width - CARD_GAP) / 2
         self.content:SetWidth(width)
 
@@ -143,7 +137,7 @@ function UILFS:BuildPanel(parent)
             b:ClearAllPoints()
             b:SetWidth(cardW)
             b:SetPoint("TOPLEFT", (slot % 2) * (cardW + CARD_GAP), -math.floor(slot / 2) * (CARD_H + CARD_GAP))
-            fillCard(b, d, level, accounts)
+            fillCard(b, d, level)
         end
         self.content:SetHeight(math.ceil(#order / 2) * (CARD_H + CARD_GAP))
     end
@@ -240,10 +234,10 @@ local function buildSearch()
             updateForm(f)
         end)
     end
-    -- DPS: clic derecho suma, clic izquierdo resta
-    f.D:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    f.D:SetScript("OnClick", function(_, button)
-        local n = f.need.D + (button == "RightButton" and 1 or -1)
+    -- DPS: la mitad derecha del círculo suma y la izquierda resta
+    f.D:SetScript("OnClick", function(self)
+        local x = GetCursorPosition() / self:GetEffectiveScale()
+        local n = f.need.D + (x >= self:GetCenter() and 1 or -1)
         f.need.D = math.max(0, math.min(MAX_DPS, n))
         f.why:SetText("")
         updateForm(f)

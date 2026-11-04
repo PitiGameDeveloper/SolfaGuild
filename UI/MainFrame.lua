@@ -597,6 +597,17 @@ local function layoutTabs()
     end
 end
 
+local function updateOnline()
+    if not (frame and frame.onlineCount) then return end
+    local n = 0
+    for _, r in pairs(SG.roster) do
+        if r.online then n = n + 1 end
+    end
+    frame.onlineCount:SetText(n)
+end
+-- aparte del refresco general, que se salta la pestaña del GM
+SG:Listen("ROSTER_UPDATED", updateOnline)
+
 local function build()
     frame = CreateFrame("Frame", "SolfaGuildFrame", UIParent, "BasicFrameTemplateWithInset")
     frame:SetSize(680, 500)
@@ -608,8 +619,17 @@ local function build()
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     tinsert(UISpecialFrames, "SolfaGuildFrame")
     frame.sgTitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    frame.sgTitle:SetPoint("TOP", 0, -6)
+    frame.sgTitle:SetPoint("TOPLEFT", 12, -6)
     frame.sgTitle:SetText(SG.ICON .. " SolfaGuild")
+
+    -- Solfers conectados, junto al botón de cerrar
+    frame.onlineIcon = frame:CreateTexture(nil, "OVERLAY")
+    frame.onlineIcon:SetTexture("Interface\\AddOns\\SolfaGuild\\Media\\silbando")
+    frame.onlineIcon:SetSize(16, 16)
+    frame.onlineIcon:SetPoint("TOPRIGHT", -28, -4)
+    frame.onlineCount = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    frame.onlineCount:SetPoint("RIGHT", frame.onlineIcon, "LEFT", -3, 0)
+    updateOnline()
 
     local body = CreateFrame("Frame", nil, frame)
     body:SetPoint("TOPLEFT", 10, -30)

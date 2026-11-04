@@ -45,7 +45,8 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] **Imágenes de las tarjetas**: son las pantallas de carga del juego (`LOADING_SCREEN` en `Data/Dungeons.lua`). Comprobar que salen, que no se ven estiradas (recorte en `fillCard`, `UI/LFS.lua`) y que cada una es la de su mazmorra. Dalaran, La Ciudad Sumergida, Krol'dok, Alcaz, Faucenegra y La Terraza del Creador salen de color: falta su identificador.
 - [ ] La rejilla no deja huecos: la primera mazmorra va en la fila 1, columna 1.
 - [ ] La lista se abre arriba del todo: primero las disponibles y luego las bloqueadas, cada grupo de mayor a menor nivel.
-- [ ] **Ventana de búsqueda**: salen los tres círculos con sus iconos (atlas `groupfinder-icon-role-large-*` o, si no existe, `UI-LFG-ICON-ROLES`), con el recorte bien. Tanque y sanador se encienden al clicar. En DPS el clic derecho suma y el izquierdo resta (de 0 a 3). Con tanque, sanador y 3 DPS se apaga "Buscar".
+- [ ] **Ventana de búsqueda**: salen los tres círculos con sus iconos (atlas `groupfinder-icon-role-large-*` o, si no existe, `UI-LFG-ICON-ROLES`), con el recorte bien. Tanque y sanador se encienden al clicar. En DPS la mitad derecha del círculo suma y la izquierda resta (de 0 a 3), también con la interfaz a otra escala. Con tanque, sanador y 3 DPS se apaga "Buscar".
+- [ ] **Ventana principal**: "SolfaGuild" sale a la izquierda; a la derecha, junto al botón de cerrar sin pisarlo, el número de conectados de la guild y el icono de `Media\silbando.tga`. El número cambia cuando alguien entra o sale.
 - [ ] El tick verde sale en las mazmorras completadas.
 - [ ] La búsqueda llega a quien toca, en el orden correcto, y nunca a quien no llega al nivel.
 - [ ] Quien acepta sale de su grupo y entra **sin pulsar nada más**.

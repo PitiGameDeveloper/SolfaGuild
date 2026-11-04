@@ -140,18 +140,6 @@ function LFS:Candidates(d, need, tried)
     return out
 end
 
--- Solfamidas conectados que podrían ir, para mostrarlo en las tarjetas
-function LFS:CountFor(d, accounts)
-    local any, n = { T = 1, H = 1, D = 1 }, 0
-    for _, acc in pairs(accounts) do
-        if not acc.mine then
-            local online = onlineChar(acc)
-            if online and bestChar(acc, d, any, online) then n = n + 1 end
-        end
-    end
-    return n
-end
-
 ---------------------------------------------------------------------------
 -- Líder: la búsqueda
 ---------------------------------------------------------------------------
