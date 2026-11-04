@@ -92,9 +92,8 @@ local function fillCard(b, d, myLevel, accounts)
     b:SetScript("OnClick", function() UILFS:OpenSearch(d) end)
 end
 
--- Panel de la pestaña: de mayor a menor nivel, colocado para que la fila de arriba
--- tenga la más alta a la que puedes ir; subiendo se ven las demás. Si aún no
--- llegas a ninguna, se abre desde el principio.
+-- Panel de la pestaña: primero las disponibles y luego las bloqueadas,
+-- cada grupo de mayor a menor nivel requerido.
 function UILFS:BuildPanel(parent)
     local p = CreateFrame("Frame", nil, parent)
     p:SetAllPoints()
@@ -106,7 +105,7 @@ function UILFS:BuildPanel(parent)
     p.content:SetSize(10, 10)
     p.scroll:SetScrollChild(p.content)
     p.cards = {}
-    p:SetScript("OnShow", function(self) self.needScroll = true end)
+    p:SetScript("OnShow", function(self) self.scroll:SetVerticalScroll(0) end)
 
     local sorted = {}
     for _, d in ipairs(SG.Dungeons) do sorted[#sorted + 1] = d end
@@ -127,11 +126,14 @@ function UILFS:BuildPanel(parent)
         local cardW = (width - CARD_GAP) / 2
         self.content:SetWidth(width)
 
-        local first = 1
-        for i, d in ipairs(sorted) do
-            if d.min <= level then first = i; break end
+        local order = {}
+        for _, d in ipairs(sorted) do
+            if d.min <= level then order[#order + 1] = d end
         end
-        for i, d in ipairs(sorted) do
+        for _, d in ipairs(sorted) do
+            if d.min > level then order[#order + 1] = d end
+        end
+        for i, d in ipairs(order) do
             local b = self.cards[i]
             if not b then
                 b = buildCard(self.content)
@@ -143,18 +145,7 @@ function UILFS:BuildPanel(parent)
             b:SetPoint("TOPLEFT", (slot % 2) * (cardW + CARD_GAP), -math.floor(slot / 2) * (CARD_H + CARD_GAP))
             fillCard(b, d, level, accounts)
         end
-        local rowH = CARD_H + CARD_GAP
-        local total = math.ceil(#sorted / 2) * rowH
-        local firstY = math.floor((first - 1) / 2) * rowH
-        -- sitio de sobra para poder dejar la primera arriba aunque haya pocas debajo
-        self.content:SetHeight(math.max(total, firstY + self.scroll:GetHeight()))
-        if self.needScroll then
-            self.needScroll = false
-            C_Timer.After(0, function()
-                self.scroll:UpdateScrollChildRect()
-                self.scroll:SetVerticalScroll(firstY)
-            end)
-        end
+        self.content:SetHeight(math.ceil(#order / 2) * (CARD_H + CARD_GAP))
     end
     return p
 end
@@ -163,6 +154,63 @@ end
 -- "Looking for Solfamidas": qué busco y cómo va
 ---------------------------------------------------------------------------
 local search
+local MAX_NEED, MAX_DPS = 4, 3   -- tú ocupas la quinta plaza del grupo
+
+-- Iconos de función del buscador de grupo: el atlas si el cliente lo tiene y, si no, el archivo
+local ROLE_FILE = "Interface\\LFGFrame\\UI-LFG-ICON-ROLES"
+local ROLE_ICON = {
+    T = { atlas = "groupfinder-icon-role-large-tank", 0, 67 / 256, 67 / 256, 134 / 256 },
+    H = { atlas = "groupfinder-icon-role-large-heal", 67 / 256, 134 / 256, 0, 67 / 256 },
+    D = { atlas = "groupfinder-icon-role-large-dps", 67 / 256, 134 / 256, 67 / 256, 134 / 256 },
+}
+
+local function setRoleIcon(tex, role)
+    local i = ROLE_ICON[role]
+    if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(i.atlas) then
+        tex:SetAtlas(i.atlas)
+    else
+        tex:SetTexture(ROLE_FILE)
+        tex:SetTexCoord(i[1], i[2], i[3], i[4])
+    end
+end
+
+-- Apagado, gris; encendido, con su color y brillo
+local function setRoleLit(b, lit)
+    b.icon:SetDesaturated(not lit)
+    b.icon:SetAlpha(lit and 1 or 0.5)
+    b.glow:SetShown(lit)
+end
+
+local function updateForm(f)
+    local need = f.need
+    setRoleLit(f.T, need.T > 0)
+    setRoleLit(f.H, need.H > 0)
+    setRoleLit(f.D, need.D > 0)
+    f.D.count:SetText(need.D)
+    f.go:SetEnabled(need.T + need.H + need.D <= MAX_NEED)
+end
+
+local function buildRole(f, role, x)
+    local b = CreateFrame("Button", nil, f.form)
+    b:SetSize(64, 64)
+    b:SetPoint("TOP", x, -6)
+    b.glow = b:CreateTexture(nil, "BACKGROUND")
+    b.glow:SetPoint("CENTER")
+    b.glow:SetSize(84, 84)
+    setRoleIcon(b.glow, role)
+    b.glow:SetBlendMode("ADD")
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints()
+    setRoleIcon(b.icon, role)
+    local hl = b:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    setRoleIcon(hl, role)
+    hl:SetBlendMode("ADD")
+    hl:SetAlpha(0.3)
+    b.label = W:Label(b, roleName(role), "GameFontHighlightSmall")
+    b.label:SetPoint("TOP", b, "BOTTOM", 0, -4)
+    return b
+end
 
 local function buildSearch()
     local f = CreateFrame("Frame", "SolfaGuildLFSSearch", UIParent, "BackdropTemplate")
@@ -181,17 +229,29 @@ local function buildSearch()
     f.form = CreateFrame("Frame", nil, f)
     f.form:SetPoint("TOPLEFT", 26, -70)
     f.form:SetPoint("BOTTOMRIGHT", -26, 56)
-    f.T = W:Check(f.form, roleName("T"))
-    f.T:SetPoint("TOPLEFT", 0, 0)
-    f.H = W:Check(f.form, roleName("H"))
-    f.H:SetPoint("TOPLEFT", 0, -28)
-    f.D = W:Check(f.form, roleName("D"))
-    f.D:SetPoint("TOPLEFT", 0, -56)
-    f.dNum = W:Edit(f.form, 30, true)
-    f.dNum:SetPoint("LEFT", f.D, "RIGHT", 60, 0)
-    f.dNum:SetMaxLetters(1)
-    f.dLabel = W:Label(f.form, "cuántos", "GameFontHighlightSmall")
-    f.dLabel:SetPoint("LEFT", f.dNum, "RIGHT", 6, 0)
+    f.need = { T = 0, H = 0, D = 0 }
+    f.T = buildRole(f, "T", -100)
+    f.H = buildRole(f, "H", 0)
+    f.D = buildRole(f, "D", 100)
+    for _, role in ipairs({ "T", "H" }) do
+        f[role]:SetScript("OnClick", function()
+            f.need[role] = 1 - f.need[role]
+            f.why:SetText("")
+            updateForm(f)
+        end)
+    end
+    -- DPS: clic derecho suma, clic izquierdo resta
+    f.D:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    f.D:SetScript("OnClick", function(_, button)
+        local n = f.need.D + (button == "RightButton" and 1 or -1)
+        f.need.D = math.max(0, math.min(MAX_DPS, n))
+        f.why:SetText("")
+        updateForm(f)
+    end)
+    f.D.count = W:BigLabel(f.D, 24)
+    f.D.count:SetPoint("BOTTOMRIGHT", 2, -2)
+    f.hint = W:Label(f.form, SG.Texts.ui.lfsDpsHint, "GameFontHighlightSmall")
+    f.hint:SetPoint("TOP", 0, -98)
     f.why = W:Label(f.form, "", "GameFontHighlightSmall")
     f.why:SetPoint("BOTTOMLEFT", 0, 0)
     f.why:SetPoint("BOTTOMRIGHT", 0, 0)
@@ -233,15 +293,17 @@ local function refreshSearch()
     if run then
         f.dungeon:SetText("|cffffd100" .. run.d.name .. "|r")
         f.go:SetText("Cancelar búsqueda")
+        f.go:Enable()
         f.go:SetScript("OnClick", function() SG.LFS:Cancel() end)
         refreshStatus(f)
     else
         local d = f.d
         f.dungeon:SetText(d and ("|cffffd100" .. d.name .. "|r") or "")
         f.go:SetText("Buscar")
+        updateForm(f)
         f.go:SetScript("OnClick", function()
-            local dps = f.D:GetChecked() and (tonumber(f.dNum:GetText()) or 0) or 0
-            local ok, why = SG.LFS:Start(d, { T = f.T:GetChecked() and 1 or 0, H = f.H:GetChecked() and 1 or 0, D = dps })
+            local need = f.need
+            local ok, why = SG.LFS:Start(d, { T = need.T, H = need.H, D = need.D })
             f.why:SetText(ok and "" or (why or ""))
             refreshSearch()
         end)
@@ -252,8 +314,7 @@ function UILFS:OpenSearch(d)
     search = search or buildSearch()
     if not SG.LFS:Run() then
         search.d = d
-        search.T:SetChecked(false); search.H:SetChecked(false); search.D:SetChecked(false)
-        search.dNum:SetText("1")
+        search.need = { T = 0, H = 0, D = 0 }
         search.why:SetText("")
     end
     search:Show()
