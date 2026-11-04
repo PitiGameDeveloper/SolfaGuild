@@ -5,7 +5,7 @@
 -- completada). Vacío = aún no se sabe, así que esa mazmorra no se marca nunca.
 -- color: fondo de la tarjeta si el juego no da imagen. art = true: hay imagen
 -- propia en Media\Dungeons\<id>.tga.
--- >>> Niveles, nombres y jefes por confirmar: ver el README <<<
+-- >>> Niveles, nombres y jefes por confirmar: ver PROBAR.md <<<
 
 local _, ns = ...
 local SG = ns.SG

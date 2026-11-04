@@ -10,7 +10,7 @@
 --
 -- En Forever no hay registro de combate (ver la sección "Forever"):
 -- Paracaidista, por el resumen de muerte. Colegón y Ángel de la guarda, por los
--- hechizos que lanzas. P.E.T.A., por la línea de experiencia. Ambulancia, por el
+-- hechizos que lanzas. P.E.T.A., por la línea de experiencia. Sorakambulancia, por el
 -- medidor de daño del propio juego (C_DamageMeter, lo mismo que usa Details).
 
 local _, ns = ...
@@ -272,7 +272,7 @@ if not SG.HasCombatLog then
 end
 
 ---------------------------------------------------------------------------
--- Forever: Ambulancia, por el medidor del propio juego. Los valores están ocultos
+-- Forever: Sorakambulancia, por el medidor del propio juego. Los valores están ocultos
 -- en combate, así que se lee al salir, y de cada sesión solo se suma lo nuevo.
 ---------------------------------------------------------------------------
 local healSeen             -- [sesión] = curación ya sumada (nil hasta la primera lectura)

@@ -9,7 +9,7 @@
   mazmorras, calendario…), hay que:
   1. escribir el código para que funcione en los dos (comprobar si existe la API nueva, por ejemplo
      `C_PartyInfo.X`, y si no usar la antigua; nada que solo exista en Classic Era sin alternativa);
-  2. apuntarlo en la sección **"Pendiente / por revisar en Forever"** del `README.md` para comprobarlo
+  2. apuntarlo en **`PROBAR.md`**, la lista de cosas que probar, para comprobarlo
      en cuanto salga Forever.
 - No hay que decir "esto es para Classic Era" ni dar por hechas las reglas de Classic Era. Si no se sabe
   cómo funciona algo en Forever, se dice y se apunta como pendiente.
@@ -50,7 +50,7 @@
 ## Pruebas
 - `python tests/run.py` simula el addon con varios clientes (necesita `tests/requirements.txt`). Pasarlo antes de publicar
   y añadir ahí los casos nuevos. Una API nueva del juego hay que añadirla también a `tests/mock.lua`. Solo prueba la
-  lógica: lo que dependa de cómo se comporta Forever se sigue apuntando en el `README.md`.
+  lógica: lo que dependa de cómo se comporta Forever se sigue apuntando en `PROBAR.md`.
 
 ## Distribución (WowUp desde GitHub)
 - La guild instala el addon con **WowUp → Instalar desde URL** → `https://github.com/PitiGameDeveloper/SolfaGuild`.
@@ -59,8 +59,8 @@
   No proponer hacerlo privado.
 - Para publicar una versión: `git tag vX.Y.Z` y `git push origin vX.Y.Z`. El workflow
   `.github/workflows/release.yml` crea la release con `SolfaGuild-vX.Y.Z.zip` (sin `.github`, `.gitignore`,
-  `CLAUDE.md` ni `tests`) y un `release.json` (formato del packager de BigWigs) con los flavors `classic` y `forever`,
+  `CLAUDE.md`, `PROBAR.md` ni `tests`) y un `release.json` (formato del packager de BigWigs) con los flavors `classic` y `forever`,
   que es lo que lee WowUp para elegir el zip. La `## Version:` del `.toc` se pone sola a partir de la etiqueta.
-- Pendiente en Forever: comprobar que WowUp reconoce el cliente como *Forever* (apuntado en el `README.md`).
+- Pendiente en Forever: comprobar que WowUp reconoce el cliente como *Forever* (apuntado en `PROBAR.md`).
 - El GM también lo instala con WowUp: **no crear enlaces/junctions** de la carpeta del proyecto en
   `Interface\AddOns` (el que había en `_classic_era_` se quitó). Los cambios llegan al juego publicando versión.

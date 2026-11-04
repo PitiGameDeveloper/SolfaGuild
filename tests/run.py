@@ -643,7 +643,7 @@ def t_cositas():
         a.fire('CHAT_MSG_COMBAT_XP_GAIN', line)
         check(line[:24], stat('boars') == want, stat('boars'))
 
-    print(' Ambulancia: medidor del juego')
+    print(' Sorakambulancia: medidor del juego')
     w, a, b, c = base()
     def session(i, mine, other=999, secret=False):
         a.rt.execute("""

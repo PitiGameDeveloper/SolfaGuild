@@ -127,7 +127,7 @@ T.cositas = {
     { key = "rolls",     title = "Ludópata",           desc = "/roll tirados." },
     { key = "need",      title = "Ninja",              desc = "Veces que ha elegido Necesidad al repartir botín." },
     { key = "rez",       title = "Ángel de la guarda", desc = "Resurrecciones lanzadas a otros jugadores (repetir a quien aún no se ha levantado no cuenta)." },
-    { key = "heal",      title = "Ambulancia",         desc = "Curación hecha, según el medidor de daño del propio juego." },
+    { key = "heal",      title = "Sorakambulancia",    desc = "Curación hecha" },
     { key = "mail",      title = "Cartero",            desc = "Correos enviados." },
     { key = "herbs",     title = "Fumeta",             desc = "Hierbas recogidas." },
     { key = "jumps",     title = "Bunny Hopper",       desc = "Saltos." },
