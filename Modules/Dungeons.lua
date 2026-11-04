@@ -14,6 +14,36 @@ local function npcId(guid)
     if kind == "Creature" or kind == "Vehicle" then return tonumber(id) end
 end
 
+-- Nombre de guild de un compañero de grupo. El juego a veces da solo el nombre, sin apellido.
+local function guildNameOf(unit)
+    local name = SG:UnitFull(unit)
+    if not name then return nil end
+    if SG:IsGuildMember(name) then return SG:Short(name) end
+    if name:find(" ", 1, true) then return nil end
+    local prefix = name .. " "
+    for full in pairs(SG.roster) do
+        if full:sub(1, #prefix) == prefix then return full end
+    end
+end
+
+-- Solfamidas de mi grupo (yo incluido), ordenados; nil si no voy con ninguno
+local function groupKey()
+    if not IsInGroup() then return nil end
+    local me, raid = SG:MyName(), IsInRaid()
+    local names, seen = { me }, { [me] = true }
+    for i = 1, GetNumGroupMembers() do
+        local unit = raid and ("raid" .. i) or ("party" .. i)
+        local name = UnitExists(unit) and guildNameOf(unit)
+        if name and not seen[name] then
+            seen[name] = true
+            names[#names + 1] = name
+        end
+    end
+    if #names < 2 then return nil end
+    table.sort(names)
+    return table.concat(names, ",")
+end
+
 function D:Complete(d)
     local now = GetTime()
     if lastDone[d.id] and now - lastDone[d.id] < 3600 then return end
@@ -22,6 +52,13 @@ function D:Complete(d)
     c.dungeons[d.id] = (c.dungeons[d.id] or 0) + 1
     SG:CheckWeek(c)
     c.dungeonsWeek = (c.dungeonsWeek or 0) + 1
+    c.dgWeek[d.id] = (c.dgWeek[d.id] or 0) + 1
+    local group = groupKey()
+    if group then
+        local key = d.id .. "|" .. group
+        c.dgTeams[key] = (c.dgTeams[key] or 0) + 1
+        c.dgTeamsWeek[key] = (c.dgTeamsWeek[key] or 0) + 1
+    end
     SG:MarkDirty()
     SG:Print("Mazmorra completada: |cffffd100" .. d.name .. "|r")
     SG:Fire("DUNGEON_DONE", d)
@@ -71,6 +108,80 @@ function D:CharDone(charName, dungeonId)
     local c = acc.chars[charName]
     if not c then return nil end
     return (c.dungeons and c.dungeons[dungeonId] or 0) > 0
+end
+
+-- Completaciones de toda la guild (week = true: solo esta semana). Quienes van juntos
+-- apuntan la misma, así que de cada grupo se toma el mayor de lo que dice cada uno (no se
+-- suman); lo que cada personaje hizo sin Solfamidas en su grupo se suma tal cual.
+-- Devuelve las mazmorras { { name, runs } } y los grupos { { accs, runs } }, de más a menos.
+function D:Runs(week)
+    local accounts = SG:Accounts()
+    local wk = week and SG:WeekKey()
+    local charToAcc = {}
+    for id, acc in pairs(accounts) do
+        for name in pairs(acc.chars) do charToAcc[name] = id end
+    end
+    local counts, best = {}, {}   -- [mazmorra] = completaciones; ["mazmorra|cuentas"] = { d, ids, runs }
+    for _, acc in pairs(accounts) do
+        local mine = {}   -- lo que dice esta cuenta, agrupado por mazmorra y cuentas
+        for _, c in pairs(acc.chars) do
+            if not week or c.weekKey == wk then
+                local together = {}   -- [mazmorra] = veces que este personaje iba en grupo
+                for key, n in pairs((week and c.dgTeamsWeek or c.dgTeams) or {}) do
+                    local d, group = key:match("^([^|]+)|(.+)$")
+                    if d then
+                        together[d] = (together[d] or 0) + n
+                        local ids, seen = {}, {}
+                        for name in group:gmatch("[^,]+") do
+                            local id = charToAcc[name]
+                            if id and not seen[id] then seen[id] = true; ids[#ids + 1] = id end
+                        end
+                        table.sort(ids)
+                        local akey = d .. "|" .. table.concat(ids, ",")
+                        mine[akey] = mine[akey] or { d = d, ids = ids, runs = 0 }
+                        mine[akey].runs = mine[akey].runs + n
+                    end
+                end
+                for d, n in pairs((week and c.dgWeek or c.dungeons) or {}) do
+                    local alone = n - (together[d] or 0)
+                    if alone > 0 then counts[d] = (counts[d] or 0) + alone end
+                end
+            end
+        end
+        for akey, t in pairs(mine) do
+            if not best[akey] or t.runs > best[akey].runs then best[akey] = t end
+        end
+    end
+    local groups = {}   -- [cuentas] = { ids, runs }
+    for _, t in pairs(best) do
+        counts[t.d] = (counts[t.d] or 0) + t.runs
+        if #t.ids >= 2 then
+            local key = table.concat(t.ids, ",")
+            groups[key] = groups[key] or { ids = t.ids, runs = 0 }
+            groups[key].runs = groups[key].runs + t.runs
+        end
+    end
+    local dungeons = {}
+    for id, runs in pairs(counts) do
+        local d = SG.DungeonById[id]
+        if d then dungeons[#dungeons + 1] = { name = d.name, runs = runs } end
+    end
+    table.sort(dungeons, function(a, b)
+        if a.runs ~= b.runs then return a.runs > b.runs end
+        return a.name < b.name
+    end)
+    local arr = {}
+    for _, g in pairs(groups) do
+        local accs = {}
+        for _, id in ipairs(g.ids) do accs[#accs + 1] = accounts[id] end
+        table.sort(accs, function(a, b) return a.main < b.main end)
+        arr[#arr + 1] = { accs = accs, runs = g.runs }
+    end
+    table.sort(arr, function(a, b)
+        if a.runs ~= b.runs then return a.runs > b.runs end
+        return a.accs[1].main < b.accs[1].main
+    end)
+    return dungeons, arr
 end
 
 -- Escalafón de mazmorras, igual que el de PvP (ver Texts.pveLadder)

@@ -371,6 +371,7 @@ function SG:MyChar()
         guild = nil,
         kills = 0, killsWeek = 0, dungeonsWeek = 0, weekKey = "",
         zones = {}, zonesWeek = {}, teams = {}, teamsWeek = {},
+        dgWeek = {}, dgTeams = {}, dgTeamsWeek = {},
         earned = 0,
         dungeons = {},
         played = 0,

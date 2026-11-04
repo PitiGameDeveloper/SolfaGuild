@@ -55,6 +55,7 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 
 ## 6. Mazmorras (`Data/Dungeons.lua`)
 - [ ] Al morir el jefe final dentro, la mazmorra cuenta **una vez** (`UNIT_DIED`, `PARTY_KILL`; `IsInInstance()` debe devolver `party` o `raid`).
+- [ ] **Mazmorras más completadas y grupos**: los Solfamidas que van juntos suman **una** completación y salen como grupo; por separado, una cada uno. Comprobar que dentro de la instancia el juego da los nombres del grupo (`UnitName`, sin valores ocultos); si no, cuentan por separado. Quien está en el grupo pero fuera de la instancia también sale en el grupo.
 - [ ] **Niveles**: las guías no coinciden. Las 6 de la captura van con sus niveles y las demás con los de AtlasLootClassic y NeedRoll. Se usa un solo rango; el nivel real para entrar suele ser menor.
 - [ ] **Jefes sin NPC ID** (aún no se marcan como completadas): Bastión de Krol'dok, Prisión de Alcaz (Blazeroar), Fuerte Faucenegra y La Terraza del Creador (Nanaya).
 - [ ] **Jefes sin confirmar**: La Ciudad Sumergida (Min'Loth) y Ciudad de Dalaran (valen Lyn y la Sombra del Archimago).

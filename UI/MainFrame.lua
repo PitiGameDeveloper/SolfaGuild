@@ -204,7 +204,7 @@ local function pvpRows(week)
         rows[#rows + 1] = { text = z.zone }
         rows[#rows + 1] = { text = INDENT .. num(z.kills) .. " " .. SKULL }
     end
-    if #zones == 0 then rows[#rows + 1] = { text = "|cff888888Aún no ha caído nadie.|r" } end
+    if #zones == 0 then rows[#rows + 1] = { text = "|cff888888Aún no ha caído nadie|r" } end
 
     blank()
     rows[#rows + 1] = { text = "Asesinatos coordinados", header = true }
@@ -214,7 +214,7 @@ local function pvpRows(week)
         for _, acc in ipairs(t.accs) do names[#names + 1] = SG:ColoredMain(acc) .. you(acc) end
         rows[#rows + 1] = { text = table.concat(names, "  "), right = num(t.kills) .. " " .. SKULL }
     end
-    if #teams == 0 then rows[#rows + 1] = { text = "|cff888888Aún no hay asesinatos en equipo.|r" } end
+    if #teams == 0 then rows[#rows + 1] = { text = "|cff888888Aún no hay asesinatos en equipo|r" } end
     return rows
 end
 
@@ -239,6 +239,24 @@ local function pveRows(week)
         rows[#rows + 1] = { text = "|cff888888Sin mazmorras|r" }
         rows[#rows + 1] = { text = INDENT .. SG:ColoredMain(nobody.acc) .. you(nobody.acc), right = num(0) .. " " .. DRAGON }
     end
+
+    local dungeons, groups = SG.DungeonTracker:Runs(week)
+    rows[#rows + 1] = { text = " " }
+    rows[#rows + 1] = { text = "Mazmorras más completadas", header = true }
+    for _, d in ipairs(dungeons) do
+        rows[#rows + 1] = { text = d.name }
+        rows[#rows + 1] = { text = INDENT .. num(d.runs) .. " " .. DRAGON }
+    end
+    if #dungeons == 0 then rows[#rows + 1] = { text = "|cff888888Aún no se ha completado ninguna|r" } end
+
+    rows[#rows + 1] = { text = " " }
+    rows[#rows + 1] = { text = "Grupos con más mazmorras", header = true }
+    for _, g in ipairs(groups) do
+        local names = {}
+        for _, acc in ipairs(g.accs) do names[#names + 1] = SG:ColoredMain(acc) .. you(acc) end
+        rows[#rows + 1] = { text = table.concat(names, "  "), right = num(g.runs) .. " " .. DRAGON }
+    end
+    if #groups == 0 then rows[#rows + 1] = { text = "|cff888888Aún no hay mazmorras en grupo|r" } end
     return rows
 end
 
@@ -258,7 +276,7 @@ local function buildCositas(parent)
     p.list:SetPoint("TOPLEFT", 8, -4)
     p.list:SetPoint("BOTTOMRIGHT", -28, 8)
     function p:Refresh()
-        local rows = { { text = "\"Los pero del equipo\" Gorovat - 2016", right = "|cff999999pasa el ratón por encima|r", header = true } }
+        local rows = { { text = "Todos somos el mejor en algo", header = true } }
         if not SG:Feature("cositas") then
             rows[#rows + 1] = { text = "|cffff5555El GM ha desactivado las Cositas: no se cuenta nada nuevo.|r" }
         end

@@ -33,6 +33,9 @@
   Solfamidas avisen de una muerte honorable con el mismo identificador del muerto (`UNIT_DIED`/`PARTY_KILL`); si falta,
   misma zona a la vez y mismo grupo u objetivo. Eso nunca suma asesinatos. Un enemigo que no da honor no debe contar
   (si un 60 ayuda a un 20, al 60 no le cuenta).
+- **Mazmorras completadas: decisión del GM.** Los Solfamidas que la hacen en el mismo grupo suman una sola completación;
+  en grupos separados, una cada uno (`DungeonTracker:Runs`). Esto vale para "mazmorras más completadas" y "grupos"; el
+  escalafón personal sigue dando una a cada jugador.
 - **En Forever los personajes tienen apellido.** La clave de un personaje es lo que dan `SG:Short`, `SG:MyName` y
   `SG:UnitFull` ("Nombre Apellido"). Nunca usar `UnitName(unit)` a secas ni `strsplit("-", nombre)`. Para susurrar o
   invitar, `SG:Target(nombre)` (`Comm:Send` ya lo hace). Para saber si alguien va en tu grupo, `SG:InMyGroup(nombre)`.

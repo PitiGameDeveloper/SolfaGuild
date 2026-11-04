@@ -102,6 +102,7 @@ function SG:CheckWeek(c)
     local wk = self:WeekKey()
     if c.weekKey ~= wk then
         c.weekKey = wk; c.killsWeek = 0; c.dungeonsWeek = 0; c.zonesWeek = {}; c.teamsWeek = {}
+        c.dgWeek = {}; c.dgTeamsWeek = {}
     end
 end
 
@@ -131,6 +132,7 @@ function SG:BuildMyProfile(public)
             cositas = c.cositas,
             dungeons = c.dungeons, zones = c.zones, zonesWeek = c.zonesWeek,
             teams = topN(c.teams, 15), teamsWeek = topN(c.teamsWeek, 15),
+            dgWeek = c.dgWeek, dgTeams = topN(c.dgTeams, 40), dgTeamsWeek = topN(c.dgTeamsWeek, 40),
         }
     end
     local main = self.db.my.main
@@ -363,7 +365,7 @@ local function restoreFrom(p)
             c.guild = c.guild or g
             c.played = math.max(n(c.played), n(old.played))
             c.kills = n(c.kills) + n(old.kills)
-            for _, f in ipairs({ "zones", "teams", "dungeons" }) do
+            for _, f in ipairs({ "zones", "teams", "dungeons", "dgTeams" }) do
                 c[f] = c[f] or {}
                 addTo(c[f], old[f])
             end
@@ -378,6 +380,8 @@ local function restoreFrom(p)
                 c.dungeonsWeek = n(c.dungeonsWeek) + n(old.dungeonsWeek)
                 c.zonesWeek = c.zonesWeek or {}; addTo(c.zonesWeek, old.zonesWeek)
                 c.teamsWeek = c.teamsWeek or {}; addTo(c.teamsWeek, old.teamsWeek)
+                c.dgWeek = c.dgWeek or {}; addTo(c.dgWeek, old.dgWeek)
+                c.dgTeamsWeek = c.dgTeamsWeek or {}; addTo(c.dgTeamsWeek, old.dgTeamsWeek)
             end
             -- del oro solo viaja el total de la cuenta (va a este personaje); a
             -- cada uno se le quita el oro que llevaba encima al empezar de cero

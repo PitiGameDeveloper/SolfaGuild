@@ -564,6 +564,46 @@ def t_dungeons():
     check('otro bicho no cuenta', a.ret('SG:MyChar().dungeonsWeek') == 1)
     no_errors(w, 'mazmorra')
 
+    print(' Mazmorras y grupos: una completación por grupo')
+    w, a, b, c = base(); w.start()
+    guid = 'Creature-0-1-1-1-639-1'
+    for x in (a, b, c):
+        x.g.INST, x.g.INST_KIND = True, 'party'
+        x.fire('PLAYER_ENTERING_WORLD')
+    def run_vc(*who):
+        for x in who:
+            x.fire('UNIT_DIED', guid)
+        for x in who:
+            x.ev('SG:BroadcastProfile()')
+        w.run(2)
+    runs = lambda x, week='false': x.ret('(SG.DungeonTracker:Runs(%s))[1] and (SG.DungeonTracker:Runs(%s))[1].runs or 0' % (week, week))
+    def groups(x, week='false'):
+        x.ev('__g = select(2, SG.DungeonTracker:Runs(%s))' % week)
+        out = []
+        for i in range(1, x.ret('#__g') + 1):
+            names = [x.ret('__g[%d].accs[%d].main' % (i, j)) for j in range(1, x.ret('#__g[%d].accs' % i) + 1)]
+            out.append((names, x.ret('__g[%d].runs' % i)))
+        return out
+
+    run_vc(a, b, c)
+    check('separados: tres completaciones', runs(a) == 3, runs(a))
+    check('separados: ningún grupo', groups(a) == [], groups(a))
+    w.run(3601)
+    w.make_group(a, b, c)
+    run_vc(a, b, c)
+    check('los tres juntos: solo una más', runs(a) == 4, runs(a))
+    check('todos ven lo mismo', runs(b) == 4 and runs(c) == 4, (runs(b), runs(c)))
+    check('el grupo sale una vez', groups(a) == [(['Ana Uno', 'Beto Dos', 'Ciro Tres'], 1)], groups(a))
+    check('la semanal también', runs(a, 'true') == 4, runs(a, 'true'))
+    w.run(3601)
+    a.ev('SG:MyChar().weekKey = "antigua"; SG:CheckWeek(SG:MyChar())')
+    check('la semana nueva borra lo mío', a.ret('next(SG:MyChar().dgWeek)') is None and a.ret('next(SG:MyChar().dgTeamsWeek)') is None)
+    check('el total sigue', runs(a) == 4, runs(a))
+    run_vc(a, b)
+    check('si falta el aviso de uno, cuenta el otro', runs(a) == 5, runs(a))
+    check('mismo grupo: misma fila', len(groups(a)) == 1 and groups(a)[0][1] == 2, groups(a))
+    no_errors(w, 'mazmorras en grupo')
+
 # ------------------------------------------------------------------ Cositas
 def t_cositas():
     print('\n== Cositas en Forever ==')
