@@ -73,7 +73,7 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] **Sorakambulancia**: suma al salir de combate (`C_DamageMeter`), también en mazmorra. Ver si incluye curarte a ti mismo o la curación que sobra.
 - [ ] **Paracaidista**: morir de una caída suma; ahogarse, la fatiga o la lava no (`environmentalType` debe ser `Falling`).
 - [ ] **Ángel de la guarda**: resucitar suma, y repetir a quien aún no se ha levantado no.
-- [ ] **Colegón**: un bufo a otro suma, repetirlo al mismo no, y a otro jugador sí (espera de 5 min).
+- [ ] **Buffon**: un bufo a otro suma, repetirlo al mismo no, y a otro jugador sí (espera de 5 min).
 - [ ] **Listas de hechizos** (`REZ_SPELLS`, `BUFF_SPELLS`): los IDs son correctos. Añadir los propios de Forever, como los de los Skyborne.
 - [ ] **P.E.T.A.**: un bicho con "jaba" en el nombre que da experiencia suma (`COMBATLOG_XPGAIN_FIRSTPERSON` debe existir y encajar).
 - [ ] **Críagusanos**: cada muerte suma una sola vez, también al liberar el espíritu.
@@ -83,7 +83,9 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] **Fumeta**: recoger hierbas suma (hechizo 2366, se compara por nombre).
 - [ ] **Camper**: suma en territorio enemigo (`C_PvP.GetZonePVPInfo` o `GetZonePVPInfo`).
 - [ ] **Bunny Hopper**, **Ludópata**, **Ninja**, **Stalker** y **Sobón**: suman (`JumpOrAscendStart`, `RandomRoll`, `RollOnLoot`, `InspectUnit`, `C_ChatInfo.PerformEmote`). Si una de esas funciones no existe, la categoría se queda a 0 sin dar error.
-- [ ] **Topes contra macros**: `/hug` con otro jugador de objetivo suma; sin objetivo, a un PNJ o a ti, no. Repetirlo no suma hasta pasados 30 s y a la misma persona, hasta pasada 1 hora; un `/reload` no lo reinicia. `/hug Fulano` solo suma si lo tienes de objetivo o va en tu grupo. Comprobar que al clicar en un jugador para inspeccionarlo cuenta (Stalker), que `/roll` suma uno por minuto y el correo uno cada 30 s.
+- [ ] **Solfamicida**: ganar un duelo a otro Solfamida suma (`CHAT_MSG_SYSTEM` con `DUEL_WINNER_KNOCKOUT` y `DUEL_WINNER_RETREAT`), también si huye, uno cada 2 min; perder, ganar a alguien de fuera o un duelo ajeno, no. Probar también un duelo a muerte: la línea puede ser otra y entonces no sumaría.
+- [ ] **Pasmao** y **Pasmao fit**: en Orgrimmar (mapa 1454, también en sus zonas interiores), parado, también en montura o ausente (AFK), suma a Pasmao, y moviéndote, a pie o en montura, a Pasmao fit (`GetUnitSpeed`).
+- [ ] **Topes contra macros**: `/hug` con otro jugador de objetivo suma; sin objetivo, a un PNJ o a ti, no. Repetirlo no suma hasta pasados 2 min, tampoco a otra persona; un `/reload` no lo reinicia. `/hug Fulano` solo suma si lo tienes de objetivo o va en tu grupo. Comprobar que al clicar en un jugador para inspeccionarlo cuenta (Stalker), que `/roll` suma uno por minuto y el correo uno cada 30 s.
 - [ ] Nota musical en los susurros de compañeros y aviso de invitación (`ChatFrameUtil.AddMessageEventFilter`, `StaticPopup_Resize`).
 
 ## 8. Otros

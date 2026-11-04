@@ -9,7 +9,7 @@
 -- Los contadores no fuerzan envíos: viajan con el perfil, que sale cada minuto si ha cambiado.
 --
 -- En Forever no hay registro de combate (ver la sección "Forever"):
--- Paracaidista, por el resumen de muerte. Colegón y Ángel de la guarda, por los
+-- Paracaidista, por el resumen de muerte. Buffon y Ángel de la guarda, por los
 -- hechizos que lanzas. P.E.T.A., por la línea de experiencia. Sorakambulancia, por el
 -- medidor de daño del propio juego (C_DamageMeter, lo mismo que usa Details).
 
@@ -43,39 +43,21 @@ local function add(key, n)
     stats[key] = (stats[key] or 0) + (n or 1)
 end
 
--- Lo que se puede hacer con una macro sin coste. wait: segundos entre uno que cuente y el
--- siguiente; same: segundos para volver a contar a la misma persona. Se guarda por cuenta
--- y sin viajar en el perfil, para que ni un /reload ni un alter lo reinicien.
-local LIMITS = {
-    hugs = { wait = 30, same = 3600 },
-    inspect = { wait = 30, same = 3600 },
-    rolls = { wait = 60 },
-    mail = { wait = 30 },
-}
+-- Lo que se puede hacer con una macro sin coste: segundos entre uno que cuente y el siguiente.
+-- Se guarda por cuenta y sin viajar en el perfil, para que ni un /reload ni un alter lo reinicien.
+local LIMITS = { hugs = 120, inspect = 120, duels = 120, rolls = 60, mail = 30 }
 
-local function addLimited(key, who)
+local function addLimited(key)
     if not stats or not enabled then return end
     local all = SG.db.my.cositasLimits or {}
     SG.db.my.cositasLimits = all
-    local seen = all[key] or { who = {} }
+    local seen = all[key] or {}
     all[key] = seen
-    local rule, now = LIMITS[key], SG:Now()
-    if seen.last and now - seen.last < rule.wait then return end
-    if who and seen.who[who] and now - seen.who[who] < rule.same then return end
-    seen.last = now
-    if who then seen.who[who] = now end
-    add(key)
-end
-
--- Lo ya caducado no hace falta guardarlo
-local function forgetLimits()
     local now = SG:Now()
-    for key, seen in pairs(SG.db.my.cositasLimits or {}) do
-        local same = LIMITS[key] and LIMITS[key].same or 0
-        for who, t in pairs(seen.who or {}) do
-            if now - t >= same then seen.who[who] = nil end
-        end
-    end
+    if seen.last and now - seen.last < LIMITS[key] then return end
+    seen.last = now
+    seen.who = nil      -- de versiones anteriores
+    add(key)
 end
 
 local function spellName(id)
@@ -96,6 +78,21 @@ end
 local CREATED_MULTI = toPattern(LOOT_ITEM_CREATED_SELF_MULTIPLE)
 local CREATED       = toPattern(LOOT_ITEM_CREATED_SELF)
 local AUCTION_WON   = toPattern(ERR_AUCTION_WON_S)
+
+-- Línea de fin de duelo. El juego da "%1$s" al ganador y "%2$s" al perdedor, en el orden de
+-- cada idioma. Devuelve el patrón y en qué captura sale el ganador.
+local function duelLine(fmt, loserFirst)
+    local pattern = toPattern(fmt)
+    if not pattern then return nil end
+    local first = fmt:match("%%(%d)%$s")
+    if first then return { pattern = pattern, winner = tonumber(first) } end
+    return { pattern = pattern, winner = loserFirst and 2 or 1 }
+end
+
+local DUEL_LINES = {
+    duelLine(DUEL_WINNER_KNOCKOUT),
+    duelLine(DUEL_WINNER_RETREAT, true),
+}
 
 ---------------------------------------------------------------------------
 -- Registro de combate (solo lo tuyo)
@@ -201,12 +198,41 @@ SG:On("CHAT_MSG_LOOT", function(msg)
     elseif CREATED and msg:match(CREATED) then add("crafted") end
 end)
 
+-- El nombre de la línea puede venir con o sin apellido
+local function isMe(name)
+    return SG:Short(name) == SG:MyName() or name == SG:Open((UnitName("player")))
+end
+
+local function solfamida(name)
+    local short = SG:Short(name)
+    if SG.roster[short] then return short end
+    for member in pairs(SG.roster) do
+        if strsplit(" ", member) == name then return member end
+    end
+end
+
+-- Solfamicida: solo se mira la línea si es un duelo; las de duelos ajenos no cuentan
+local function onDuelLine(msg)
+    for _, line in pairs(DUEL_LINES) do
+        local first, second = msg:match(line.pattern)
+        if first then
+            local winner, loser = first, second
+            if line.winner == 2 then winner, loser = second, first end
+            if isMe(winner) and not isMe(loser) and solfamida(loser) then addLimited("duels") end
+            return
+        end
+    end
+end
+
 SG:On("CHAT_MSG_SYSTEM", function(msg)
-    if AUCTION_WON and msg and msg:match(AUCTION_WON) then add("ah") end
+    msg = SG:Open(msg)
+    if type(msg) ~= "string" then return end
+    if AUCTION_WON and msg:match(AUCTION_WON) then add("ah") end
+    onDuelLine(msg)
 end)
 
 ---------------------------------------------------------------------------
--- Forever: Colegón y Ángel de la guarda, por los hechizos que lanzas a otros
+-- Forever: Buffon y Ángel de la guarda, por los hechizos que lanzas a otros
 ---------------------------------------------------------------------------
 -- Primer rango de cada hechizo: los demás rangos se llaman igual y se compara por nombre
 local BUFF_SPELLS = {
@@ -365,6 +391,16 @@ barber:SetScript("OnEvent", function() add("barber") end)
 ---------------------------------------------------------------------------
 -- Contadores de tiempo y sesión
 ---------------------------------------------------------------------------
+local ORGRIMMAR = 1454     -- identificador del mapa: vale en cualquier idioma
+
+-- Pasmao y Pasmao fit, por la velocidad: en montura también. Pasmao cuenta aunque estés ausente.
+local function tickOrgrimmar()
+    local map = C_Map and C_Map.GetBestMapForUnit and SG:Open(C_Map.GetBestMapForUnit("player"))
+    if map ~= ORGRIMMAR then return end
+    local speed = GetUnitSpeed and SG:Open((GetUnitSpeed("player")))
+    if type(speed) == "number" then add(speed > 0 and "orgMove" or "orgIdle", TICK) end
+end
+
 local function tick()
     if not stats then return end
     local c = SG:MyChar()
@@ -381,6 +417,7 @@ local function tick()
     if not afk and IsSwimming() then add("swim", TICK) end
     local zoneInfo = (C_PvP and C_PvP.GetZonePVPInfo) or GetZonePVPInfo
     if not afk and zoneInfo and zoneInfo() == "hostile" then add("enemyLand", TICK) end
+    tickOrgrimmar()
     if UnitIsGhost("player") then add("ghost", TICK) end
     if inGroup() then add("group", TICK) end
 end
@@ -442,16 +479,13 @@ function Cos:OnLogin()
     hook("RandomRoll", function() addLimited("rolls") end)
     hook("RollOnLoot", function(_, rollType) if rollType == LOOT_NEED then add("need") end end)
     hook("ConfirmTalentWipe", function() add("respec") end)
-    forgetLimits()
     hook("InspectUnit", function(unit)
-        local who = playerAt(unit)
-        if who then addLimited("inspect", who) end
+        if playerAt(unit) then addLimited("inspect") end
     end)
     -- el chat usa C_ChatInfo.PerformEmote y DoEmote solo la llama a ella: engancharse a las dos contaría doble
     local function onEmote(token, arg)
         if type(token) ~= "string" or not CUDDLY[token:upper()] then return end
-        local who = emoteTarget(arg)
-        if who then addLimited("hugs", who) end
+        if emoteTarget(arg) then addLimited("hugs") end
     end
     if C_ChatInfo and C_ChatInfo.PerformEmote then
         hooksecurefunc(C_ChatInfo, "PerformEmote", onEmote)

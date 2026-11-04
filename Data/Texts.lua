@@ -108,7 +108,7 @@ T.cositas = {
     { key = "swim",      title = "Como pez en el agua", desc = "Tiempo nadando", time = true },
     { key = "played",    title = "Sudoroso",           desc = "Tiempo jugado", time = true },
     { key = "enemyLand", title = "Camper",             desc = "Tiempo en territorio de la %enemy%", time = true },
-    { key = "buffs",     title = "Colegón",            desc = "Bufos lanzados a otros jugadores" },
+    { key = "buffs",     title = "Buffon",             desc = "Bufos lanzados a otros jugadores" },
     { key = "respec",    title = "Meta chaser",        desc = "Veces que se ha reiniciado los talentos" },
     -- oculta hasta probar en Forever si hay peluquería (se sigue contando si existe el evento)
     -- { key = "barber",    title = "Estiloso",          desc = "Cambios de peinado en la peluquería" },
@@ -120,16 +120,19 @@ T.cositas = {
     { key = "falls",     title = "Paracaidista",       desc = "Muertes por caída" },
     { key = "ghost",     title = "Salvapantallas gris", desc = "Tiempo como fantasma, corriendo de vuelta al cadáver", time = true },
     { key = "leeroy",    title = "Leeeeroy Jenkins!",  desc = "Veces que ha sido el primero del grupo en morir" },
-    { key = "hugs",      title = "Sobón",              desc = "Abrazos, besos y demás arrumacos a otros jugadores (uno por persona cada hora)" },
-    { key = "inspect",   title = "Stalker",            desc = "Inspecciones a otros jugadores (una por persona cada hora)" },
-    { key = "rolls",     title = "Ludópata",           desc = "/roll tirados (uno por minuto)" },
+    { key = "hugs",      title = "Sobón",              desc = "Abrazos, besos, caricias y demás arrumacos" },
+    { key = "inspect",   title = "Stalker",            desc = "Veces que ha inspeccionado a otros jugadores" },
+    { key = "rolls",     title = "Ludópata",           desc = "/roll tirados" },
     { key = "need",      title = "Ninja",              desc = "Veces que ha elegido Necesidad al repartir botín" },
     { key = "rez",       title = "Ángel de la guarda", desc = "Resurrecciones lanzadas a otros jugadores" },
     { key = "heal",      title = "Sorakambulancia",    desc = "Curación hecha" },
-    { key = "mail",      title = "Cartero",            desc = "Correos enviados (uno cada 30 s)" },
+    { key = "mail",      title = "Cartero",            desc = "Correos enviados" },
     { key = "herbs",     title = "Fumeta",             desc = "Hierbas recogidas" },
     { key = "jumps",     title = "Bunny Hopper",       desc = "Saltos" },
     { key = "session",   title = "Adicto al Monster",  desc = "La sesión de juego seguida más larga (sin desconectarse)", time = true },
+    { key = "duels",     title = "Solfamicida",        desc = "Duelos ganados a otros Solfamidas" },
+    { key = "orgIdle",   title = "Pasmao",             desc = "Tiempo parado en Orgrimmar", time = true },
+    { key = "orgMove",   title = "Pasmao fit",         desc = "Tiempo moviéndote en Orgrimmar", time = true },
 }
 
 T.ui = {
