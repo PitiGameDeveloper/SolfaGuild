@@ -541,11 +541,11 @@ def t_ui():
     check('sin elegir nada avisa', 'Elige' in (a.ret('SolfaGuildLFSSearch.why:GetText()') or ''), a.ret('SolfaGuildLFSSearch.why:GetText()'))
     S = 'SolfaGuildLFSSearch'
     def dps(button): a.ev('%s.D:GetScript("OnClick")(%s.D, %r)' % (S, S, button))
-    LEFT, RIGHT = 'LeftButton', 'RightButton'
+    RESTA, SUMA = 'RightButton', 'LeftButton'
     check('sin los iconos del LFG: los otros, con aro', a.ret(S + '.T.ring ~= nil') and a.ret(S + '.T.icon._atlas') is None)
-    dps(LEFT)
+    dps(RESTA)
     check('DPS no baja de 0', a.ret(S + '.need.D') == 0)
-    for _ in range(5): dps(RIGHT)
+    for _ in range(5): dps(SUMA)
     check('DPS no sube de 3', a.ret(S + '.need.D') == 3)
     check('el número se ve', a.ret(S + '.D.count:GetText()') == 3)
     a.ev(S + '.T:Click()')
@@ -553,11 +553,11 @@ def t_ui():
     check('tanque y 3 DPS: se puede buscar', a.ret(S + '.go:IsEnabled()') is True)
     a.ev(S + '.H:Click()')
     check('tanque, sanador y 3 DPS: Buscar se apaga', a.ret(S + '.go:IsEnabled()') is False)
-    dps(LEFT)
+    dps(RESTA)
     check('con 2 DPS vuelve a encenderse', a.ret(S + '.go:IsEnabled()') is True)
     a.ev(S + '.T:Click(); ' + S + '.H:Click()')
     check('tanque y sanador se apagan', a.ret(S + '.need.T') == 0 and a.ret(S + '.H.glow:IsShown()') is False)
-    dps(LEFT)
+    dps(RESTA)
     check('un DPS', a.ret(S + '.need.D') == 1)
     a.ev('SolfaGuildLFSSearch.go:Click()')
     w.run(1)
