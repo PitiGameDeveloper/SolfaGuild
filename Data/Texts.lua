@@ -122,6 +122,8 @@ T.cositas = {
     { key = "duels",     title = "Solfamicida",        desc = "Duelos ganados a otros Solfamidas" },
     { key = "orgIdle",   title = "Pasmao",             desc = "Tiempo parado en Orgrimmar", time = true },
     { key = "orgMove",   title = "Pasmao fit",         desc = "Tiempo moviéndote en Orgrimmar", time = true },
+    { key = "walked",    title = "No pilló el vuelo",  desc = "Yardas recorridas a pie o en montura" },
+    { key = "flown",     title = "Va flying", desc = "Yardas recorridas volando" },
 }
 
 T.ui = {

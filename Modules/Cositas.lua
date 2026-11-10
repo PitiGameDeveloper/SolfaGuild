@@ -12,6 +12,7 @@
 -- Paracaidista, por el resumen de muerte. Buffon y Ángel de la guarda, por los
 -- hechizos que lanzas. P.E.T.A., por la línea de experiencia. Sorakambulancia, por el
 -- medidor de daño del propio juego (C_DamageMeter, lo mismo que usa Details).
+-- Las distancias (No pilló el vuelo, Va flying) usan las coordenadas del mapa (C_Map).
 
 local _, ns = ...
 local SG = ns.SG
@@ -401,6 +402,73 @@ local function tickOrgrimmar()
     if type(speed) == "number" then add(speed > 0 and "orgMove" or "orgIdle", TICK) end
 end
 
+-- Distancias recorridas, en yardas, en dos categorías que nunca cuentan a la vez:
+--   walked: a pie, en montura o por el suelo (no volando, ni en taxi, ni cayendo, ni nadando).
+--   flown:  volando (IsFlying) o en taxi.
+-- Se mide en horizontal (las coordenadas del mundo son un plano), así que caer de un
+-- acantilado o subir y bajar no suma. Un movimiento de menos de TRACK_STEP yardas desde el
+-- último punto contado no suma: el spam de teclas en el sitio (saltar, ir de lado y volver)
+-- se queda en nada. Un salto mayor de TRACK_MAX es un teletransporte o un portal: no cuenta.
+local TRACK_STEP = 10
+local TRACK_MAX = 400
+local tracks = {
+    walked = { anchor = nil, left = 0 },   -- { cont, x, y } desde el que se mide y fracción pendiente
+    flown  = { anchor = nil, left = 0 },
+}
+
+-- Posición en el mundo (yardas) y continente, o nil si el mapa no la da
+local function worldPoint()
+    local C = C_Map
+    if not (C and C.GetBestMapForUnit and C.GetPlayerMapPosition and C.GetWorldPosFromMapPos) then return nil end
+    local map = SG:Open(C.GetBestMapForUnit("player"))
+    local pos = map and SG:Open(C.GetPlayerMapPosition(map, "player"))
+    if not pos then return nil end
+    local cont, world = C.GetWorldPosFromMapPos(map, pos)
+    if not (cont and world) then return nil end
+    local x, y = world:GetXY()
+    if type(x) ~= "number" or type(y) ~= "number" then return nil end
+    return cont, x, y
+end
+
+-- Mide un tramo de una categoría: active = si ahora cuenta para ella
+local function trackStep(key, active, cont, x, y)
+    local t = tracks[key]
+    if not active or not cont then t.anchor = nil return end
+    local a = t.anchor
+    if not a or a.cont ~= cont then
+        t.anchor = { cont = cont, x = x, y = y }
+        return
+    end
+    local dx, dy = x - a.x, y - a.y
+    local d = math.sqrt(dx * dx + dy * dy)
+    if d < TRACK_STEP then return end
+    a.x, a.y = x, y
+    if d > TRACK_MAX then return end
+    t.left = t.left + d
+    local whole = math.floor(t.left)
+    if whole > 0 then
+        add(key, whole)
+        t.left = t.left - whole
+    end
+end
+
+local function moveTick(afk)
+    local flying = SG:Open(IsFlying and IsFlying()) and true or false
+    local taxi = SG:Open(UnitOnTaxi and UnitOnTaxi("player")) and true or false
+    local falling = SG:Open(IsFalling and IsFalling()) and true or false
+    local swimming = SG:Open(IsSwimming and IsSwimming()) and true or false
+    local flyingNow = not afk and (flying or taxi)
+    local onFoot = not afk and not flying and not taxi and not falling and not swimming
+    if not flyingNow and not onFoot then
+        trackStep("flown", false)
+        trackStep("walked", false)
+        return
+    end
+    local cont, x, y = worldPoint()
+    trackStep("flown", flyingNow, cont, x, y)
+    trackStep("walked", onFoot, cont, x, y)
+end
+
 -- Territorio de cada facción, por mapa (uiMapID). Hace falta porque en Forever el juego no
 -- decía "hostile" en Loch Modan (11-nov). Las zonas en disputa (Los Humedales...) no cuentan.
 local FACTION_LAND = {
@@ -449,6 +517,7 @@ local function tick()
 
     local afk = UnitIsAFK("player")
     if not SG.HasCombatLog then forgetRezzed(GetTime()) end
+    moveTick(afk)
     if not afk and IsSwimming() then add("swim", TICK) end
     if not afk and inEnemyLand() then add("enemyLand", TICK) end
     tickOrgrimmar()
