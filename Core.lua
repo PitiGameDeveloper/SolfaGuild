@@ -8,7 +8,9 @@ ns.SG = SG
 _G.SolfaGuild = SG
 
 SG.name    = ADDON_NAME
-SG.version = "0.1.0"
+-- La versión la pone el workflow de publicación en el .toc a partir de la etiqueta
+local getMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+SG.version = (getMeta and getMeta(ADDON_NAME, "Version")) or "0.1.0"
 SG.PREFIX  = "SolfaGuild"
 SG.ICON    = "|TInterface\\AddOns\\SolfaGuild\\Media\\clef:14:14|t"
 SG.ICON_PATH = "Interface\\AddOns\\SolfaGuild\\Media\\clef"

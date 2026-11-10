@@ -401,6 +401,41 @@ local function tickOrgrimmar()
     if type(speed) == "number" then add(speed > 0 and "orgMove" or "orgIdle", TICK) end
 end
 
+-- Territorio de cada facción, por mapa (uiMapID). Hace falta porque en Forever el juego no
+-- decía "hostile" en Loch Modan (11-nov). Las zonas en disputa (Los Humedales...) no cuentan.
+local FACTION_LAND = {
+    [1426] = "Alliance", [1429] = "Alliance", [1432] = "Alliance", [1436] = "Alliance",   -- Dun Morogh, Elwynn, Loch Modan, Páramos de Poniente
+    [1438] = "Alliance", [1439] = "Alliance",                                             -- Teldrassil, Costa Oscura
+    [1453] = "Alliance", [1455] = "Alliance", [1457] = "Alliance",                        -- Ventormenta, Forjaz, Darnassus
+    [1411] = "Horde", [1412] = "Horde", [1413] = "Horde", [1420] = "Horde", [1421] = "Horde", -- Durotar, Mulgore, Los Baldíos, Tirisfal, Bosque de Argénteos
+    [1454] = "Horde", [1456] = "Horde", [1458] = "Horde",                                 -- Orgrimmar, Cima del Trueno, Entrañas
+    -- Zonas nuevas de Forever (mapas de Polestar, 11-nov): ninguna es de una sola facción, así que no van aquí.
+    -- 2482 Monte Hyjal y 2548 Riverglades: en disputa (las dos facciones tienen base).
+    -- 2521 Isla de Zephras: inicio de los Cielonatos, que pueden ser de las dos facciones.
+}
+Cos.FACTION_LAND = FACTION_LAND
+
+-- Dueño de la zona donde estoy: el mapa o el que lo contiene (una cueva, un barrio...)
+local function landOwner()
+    local M = C_Map
+    if not (M and M.GetBestMapForUnit) then return nil end
+    local id = SG:Open(M.GetBestMapForUnit("player"))
+    for _ = 1, 4 do
+        if not id then return nil end
+        if FACTION_LAND[id] then return FACTION_LAND[id] end
+        local info = M.GetMapInfo and M.GetMapInfo(id)
+        id = info and info.parentMapID
+    end
+end
+
+local function inEnemyLand()
+    if IsInInstance() then return false end
+    local zoneInfo = (C_PvP and C_PvP.GetZonePVPInfo) or GetZonePVPInfo
+    if zoneInfo and SG:Open(zoneInfo()) == "hostile" then return true end
+    local owner, mine = landOwner(), UnitFactionGroup("player")
+    return owner ~= nil and mine ~= nil and owner ~= mine
+end
+
 local function tick()
     if not stats then return end
     local c = SG:MyChar()
@@ -415,8 +450,7 @@ local function tick()
     local afk = UnitIsAFK("player")
     if not SG.HasCombatLog then forgetRezzed(GetTime()) end
     if not afk and IsSwimming() then add("swim", TICK) end
-    local zoneInfo = (C_PvP and C_PvP.GetZonePVPInfo) or GetZonePVPInfo
-    if not afk and zoneInfo and zoneInfo() == "hostile" then add("enemyLand", TICK) end
+    if not afk and inEnemyLand() then add("enemyLand", TICK) end
     tickOrgrimmar()
     if UnitIsGhost("player") then add("ghost", TICK) end
     if inGroup() then add("group", TICK) end

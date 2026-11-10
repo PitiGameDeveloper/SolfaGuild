@@ -168,6 +168,7 @@ T.ui = {
     campGoing = "Vas en ayuda de %who%. Aceptarás su invitación automáticamente.",
     campNoJoin = "%who% no ha podido entrar en el grupo tras varios intentos.",
     campComing = "%who% acude a la llamada. Invitándole al grupo...",
+    newVersion = "|cffff8800Hay una versión nueva de SolfaGuild (v%new%; tú tienes la v%old%).|r Actualízala con WowUp y haz /reload.",
 }
 
 -- Sustituye marcadores

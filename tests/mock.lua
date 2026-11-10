@@ -116,10 +116,12 @@ MAPS = {
     [1415] = { inst = 0, x = 0, y = 0, w = 1, h = 1 },
 }
 MAP_ID, POS_X, POS_Y = 1411, 0.5, 0.5
+MAP_PARENT = { [9999] = 1432 }   -- 9999: una cueva dentro de Loch Modan
 local function vec(x, y) return { x = x, y = y, GetXY = function(s) return s.x, s.y end } end
 CreateVector2D = vec
 C_Map = {
     GetBestMapForUnit = function() return MAP_ID end,
+    GetMapInfo = function(id) return { mapID = id, parentMapID = MAP_PARENT[id] } end,
     GetPlayerMapPosition = function() if POS_X then return vec(POS_X, POS_Y) end end,
     GetWorldPosFromMapPos = function(id, v)
         local m = MAPS[id]

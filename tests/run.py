@@ -1012,6 +1012,27 @@ def t_cositas():
     print('\n== Cositas en Forever ==')
     w, a, b, c = base(); w.start()
     stat = lambda k: a.ret('SG:MyChar().cositas.%s or 0' % k)
+    print(' Camper: territorio de la otra facción')
+    camper = lambda: stat('enemyLand')
+    a.ev('UNITS.player.faction = "Alliance"; MAP_ID = 1432')
+    n = camper(); w.run(30)
+    check('en Loch Modan siendo Alianza: no', camper() == n, camper() - n)
+    a.ev('MAP_ID = 1411')
+    n = camper(); w.run(30)
+    check('en Durotar siendo Alianza: sí, aunque el juego diga disputa', camper() > n, camper() - n)
+    a.ev('UNITS.player.faction = "Horde"; MAP_ID = 9999')
+    n = camper(); w.run(30)
+    check('en una cueva de Loch Modan siendo Horda: sí', camper() > n, camper() - n)
+    a.ev('MAP_ID = 1437')
+    n = camper(); w.run(30)
+    check('en Los Humedales (en disputa): no', camper() == n, camper() - n)
+    a.g.INST, a.g.INST_KIND = True, 'party'
+    a.ev('MAP_ID = 1411; UNITS.player.faction = "Alliance"')
+    n = camper(); w.run(30)
+    check('dentro de una instancia: no', camper() == n, camper() - n)
+    a.g.INST, a.g.INST_KIND = False, 'none'
+    a.ev('UNITS.player.faction = "Alliance"; MAP_ID = 1411')
+
     print(' lo que se puede macrear: objetivo, espera y por persona')
     def skip(key): a.ev('SG.db.my.cositasLimits.%s.last = 0' % key)
     def hug(arg=''): a.ev('C_ChatInfo.PerformEmote("HUG", %r)' % arg)
@@ -1398,8 +1419,26 @@ def t_guildmap(forever):
     w.run(25)
     no_errors(w, 'mapa de la guild')
 
+def t_version():
+    print('\n== Aviso de versión nueva ==')
+    w, a, b, c = base()
+    a.ev('SG.version = "0.4.23"'); b.ev('SG.version = "0.4.24"'); c.ev('SG.version = "0.4.9"')
+    w.start()
+    w.run(15)
+    warns = lambda x: sum(1 for p in x.prints if 'versión nueva' in p)
+    check('comparar versiones', a.ret('SG.Version.Newer("0.4.24", "0.4.9")') and not a.ret('SG.Version.Newer("0.4.9", "0.4.24")')
+          and not a.ret('SG.Version.Newer("0.4.24", "0.4.24")') and not a.ret('SG.Version.Newer("raro", "0.1.0")'))
+    check('quien la tiene vieja recibe el aviso', warns(a) == 1 and warns(c) == 1, (warns(a), warns(c)))
+    check('dice cuál es la nueva', any('v0.4.24' in p and 'v0.4.23' in p for p in a.prints))
+    check('quien está al día, no', warns(b) == 0, warns(b))
+    w.run(600)
+    check('se repite a los 10 minutos', warns(a) == 2, warns(a))
+    w.run(600)
+    check('y otra vez', warns(a) == 3, warns(a))
+    no_errors(w, 'versión')
+
 TESTS = [lambda: t_guildmap(True), lambda: t_guildmap(False), t_cositas, lambda: t_names(0), lambda: t_names(1), lambda: t_names(2), t_migration, t_chars, t_pvp, t_pvp_ladder, t_classic, t_sos,
-         lambda: t_lfs(0), lambda: t_lfs(1), lambda: t_lfs(2), t_lfs_edges, t_lfs_send, t_lfs_feedback, t_ui, t_dungeons, t_cards]
+         lambda: t_lfs(0), lambda: t_lfs(1), lambda: t_lfs(2), t_lfs_edges, t_lfs_send, t_lfs_feedback, t_ui, t_dungeons, t_cards, t_version]
 
 for strict in ('', '1'):
     os.environ['STRICT'] = strict

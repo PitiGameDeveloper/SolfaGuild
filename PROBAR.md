@@ -87,7 +87,13 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 - [ ] **Meta chaser**: cuenta `ConfirmTalentWipe`. Si Forever reinicia talentos de otra forma, hay que contarlo de otra manera.
 - [ ] **Broker** y **Manos callosas**: siguen existiendo `ERR_AUCTION_WON_S`, `LOOT_ITEM_CREATED_SELF` y `LOOT_ITEM_CREATED_SELF_MULTIPLE`.
 - [ ] **Fumeta**: recoger hierbas suma (hechizo 2366, se compara por nombre).
-- [ ] **Camper**: suma en territorio enemigo (`C_PvP.GetZonePVPInfo` o `GetZonePVPInfo`).
+- [ ] **Camper**: suma en territorio enemigo. 11-nov: en Loch Modan (Horda) no sumaba, así que el juego no daba `hostile`. Ahora
+  también mira la lista `FACTION_LAND` de `Modules/Cositas.lua` (mapas de Classic). Comprobar que suma en Loch Modan y que
+  `C_Map.GetBestMapForUnit("player")` da los mismos números que Classic (1432 Loch Modan). Si Forever tiene zonas nuevas de una
+  facción, añadirlas a la lista. En zonas en disputa (Los Humedales) no suma. Zonas nuevas de Forever, que según las guías no
+  son de ninguna facción y por eso no están en la lista: Monte Hyjal (2482) y Riverglades (2548), en disputa; Isla de Zephras
+  (2521), inicio de los Cielonatos de las dos facciones. Al entrar en cada una, comprobar que el juego dice "en disputa" (o
+  "santuario"); si alguna dice "Territorio de la Alianza/Horda", añadirla a `FACTION_LAND`.
 - [ ] **Bunny Hopper**, **Ludópata**, **Ninja**, **Stalker** y **Sobón**: suman (`JumpOrAscendStart`, `RandomRoll`, `RollOnLoot`, `InspectUnit`, `C_ChatInfo.PerformEmote`). Si una de esas funciones no existe, la categoría se queda a 0 sin dar error.
 - [ ] **Solfamicida**: ganar un duelo a otro Solfamida suma (`CHAT_MSG_SYSTEM` con `DUEL_WINNER_KNOCKOUT` y `DUEL_WINNER_RETREAT`), también si huye, uno cada 2 min; perder, ganar a alguien de fuera o un duelo ajeno, no. Probar también un duelo a muerte: la línea puede ser otra y entonces no sumaría.
 - [ ] **Pasmao** y **Pasmao fit**: en Orgrimmar (mapa 1454, también en sus zonas interiores), parado, también en montura o ausente (AFK), suma a Pasmao, y moviéndote, a pie o en montura, a Pasmao fit (`GetUnitSpeed`).

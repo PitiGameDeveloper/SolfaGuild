@@ -151,6 +151,7 @@ function SG:BuildMyProfile(public)
         earned = earned,
         updated = self:Now(),
         milestones = self.db.my.milestones,
+        v = self.version,
     }
 end
 

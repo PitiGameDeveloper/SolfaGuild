@@ -24,6 +24,7 @@ Modules\Social.lua
 Modules\CampSOS.lua
 Modules\Events.lua
 Modules\GuildMap.lua
+Modules\Version.lua
 UI\Widgets.lua
 UI\LFS.lua
 UI\MainFrame.lua
