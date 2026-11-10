@@ -179,7 +179,8 @@ end
 local function refreshPin(name)
     if not canvas then return end
     local p = positions[name]
-    local shown = opened and p and WorldMapFrame:GetMapID()
+    -- Los de tu grupo ya salen en el mapa del juego: no se duplican
+    local shown = opened and p and not SG:InMyGroup(name) and WorldMapFrame:GetMapID()
     local nx, ny
     if shown then nx, ny = project(p.m, p.x / PRECISION, p.y / PRECISION, shown) end
     if not nx or nx < 0 or nx > 1 or ny < 0 or ny > 1 then
@@ -264,6 +265,11 @@ Comm:Register("POS", function(msg, sender, channel)
         positions[sender] = nil
     end
     refreshPin(sender)
+end)
+
+-- Al entrar o salir alguien del grupo, su marca aparece o desaparece
+SG:On("GROUP_ROSTER_UPDATE", function()
+    if opened then refreshAll() end
 end)
 
 SG:Listen("SETTINGS_CHANGED", function()

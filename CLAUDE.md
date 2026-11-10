@@ -28,10 +28,12 @@
   al jugador) y hay valores ocultos (`issecretvalue`, usar `SG:Open`): solo se registra si `SG.HasCombatLog`. Hay
   otras vías: `UNIT_DIED`, `PARTY_KILL`, muertes honorables y `C_DeathRecap` (ver `Modules/PvP.lua` y
   `Modules/CampSOS.lua`), hechizos propios (`UNIT_SPELLCAST_*`) y `C_DamageMeter` para curación y daño, como Details
-  (`Modules/Cositas.lua`; sus valores están ocultos en combate, se leen al salir).
+  (`Modules/Cositas.lua`; sus valores están ocultos en combate, se leen al salir). Las mazmorras se
+  cuentan con `ENCOUNTER_START`/`ENCOUNTER_END` (jefe final en `boss1..5` u objetivo), porque `UNIT_DIED` no daba nada dentro.
 - **PvP en Forever: decisión del GM.** Solo cuentan las muertes honorables. Un asesinato coordinado es que varios
   Solfamidas avisen de una muerte honorable con el mismo identificador del muerto (`UNIT_DIED`/`PARTY_KILL`); si falta,
-  misma zona a la vez y mismo grupo u objetivo. Eso nunca suma asesinatos. Un enemigo que no da honor no debe contar
+  misma zona a la vez y mismo grupo u objetivo. Eso nunca suma asesinatos. Un equipo es de 2 a 5 (`PvP.MAX_TEAM`): los de
+banda no se apuntan ni salen en la ventana (no caben), aunque la kill sí cuenta a cada uno. Un enemigo que no da honor no debe contar
   (si un 60 ayuda a un 20, al 60 no le cuenta).
 - **Mazmorras completadas: decisión del GM.** Los Solfamidas que la hacen en el mismo grupo suman una sola completación;
   en grupos separados, una cada uno (`DungeonTracker:Runs`). Esto vale para "mazmorras más completadas" y "grupos"; el

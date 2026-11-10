@@ -1,4 +1,5 @@
--- SolfaGuild - Mazmorras completadas (muerte del jefe final dentro de la instancia)
+-- SolfaGuild - Mazmorras completadas (muerte del jefe final dentro de la instancia, o fin
+-- de su encuentro)
 
 local _, ns = ...
 local SG = ns.SG
@@ -83,6 +84,13 @@ SG:On("PLAYER_LEVEL_UP", function(level)
     SG:MarkDirty()
 end)
 
+-- Mazmorra de la que es jefe final una unidad (nil si no lo es o no se puede saber)
+local function dungeonOfUnit(unit)
+    if not SG:Open(UnitExists(unit)) then return nil end
+    local id = npcId(SG:Open(UnitGUID(unit)))
+    return id and SG.DungeonByBoss[id]
+end
+
 local function onDeath(guid)
     -- en Forever algunos valores pueden venir ocultos: con esos no se puede operar
     if not guid or (issecretvalue and issecretvalue(guid)) then return end
@@ -91,13 +99,66 @@ local function onDeath(guid)
     if d then SG:Try(D.Complete, D, d) end
 end
 
+-- Encuentros con jefe (ENCOUNTER_START / ENCOUNTER_END): en Forever es lo que funciona
+-- dentro de las mazmorras (lo comprobó MuddyBoots). La muerte de una criatura no se ve.
+-- Al empezar se miran los jefes (boss1..boss5) y, al acabar bien, si alguno era el final.
+-- Lo que se averigua se guarda por identificador de encuentro, para las siguientes veces.
+local fight = nil   -- { id, d } del encuentro en curso
+
+local function encounters()
+    SolfaGuildDB.encounters = SolfaGuildDB.encounters or {}
+    return SolfaGuildDB.encounters
+end
+
+local function scanBosses()
+    if not fight or fight.d then return end
+    for i = 1, 5 do
+        local d = dungeonOfUnit("boss" .. i)
+        if d then fight.d = d; return end
+    end
+end
+
+local function onEncounterStart(id)
+    id = SG:Open(id)
+    fight = { id = id }
+    scanBosses()
+end
+
+local function onEncounterEnd(id, name, _, _, success)
+    id, name, success = SG:Open(id), SG:Open(name), SG:Open(success)
+    scanBosses()
+    local d = fight and fight.d
+    fight = nil
+    SG:Debug("Fin de encuentro:", tostring(id), tostring(name), "bien:", tostring(success), "mazmorra:", d and d.id or "?")
+    if not (success == 1 or success == true) then return end
+    -- si el jefe no salía como boss1..5, quizá lo tienes en el objetivo
+    d = d or dungeonOfUnit("target")
+    local known = id and encounters()[id]
+    if d then
+        if id then encounters()[id] = d.id end
+    elseif known then
+        d = SG.DungeonById[known]
+    end
+    if d then SG:Try(D.Complete, D, d) end
+end
+
 -- Solo se escucha dentro de mazmorras y bandas (fuera no hay jefes que contar), y
--- lo único que se mira es si alguien ha muerto. En Forever no hay registro de
--- combate: están los eventos UNIT_DIED y PARTY_KILL. Complete() ya evita contar dos veces.
+-- lo único que se mira es si alguien ha muerto o se ha acabado un encuentro. En Forever no
+-- hay registro de combate: están UNIT_DIED, PARTY_KILL y los encuentros. Complete() ya evita
+-- contar dos veces.
 local DEATH_EVENTS = SG.HasCombatLog and { "COMBAT_LOG_EVENT_UNFILTERED" } or { "UNIT_DIED", "PARTY_KILL" }
+DEATH_EVENTS[#DEATH_EVENTS + 1] = "ENCOUNTER_START"
+DEATH_EVENTS[#DEATH_EVENTS + 1] = "ENCOUNTER_END"
+DEATH_EVENTS[#DEATH_EVENTS + 1] = "INSTANCE_ENCOUNTER_ENGAGE_UNIT"
 local cl = CreateFrame("Frame")
-cl:SetScript("OnEvent", function(_, event, a, b)
-    if event == "COMBAT_LOG_EVENT_UNFILTERED" then
+cl:SetScript("OnEvent", function(_, event, a, b, c, d, e)
+    if event == "ENCOUNTER_START" then
+        SG:Try(onEncounterStart, a)
+    elseif event == "ENCOUNTER_END" then
+        SG:Try(onEncounterEnd, a, b, c, d, e)
+    elseif event == "INSTANCE_ENCOUNTER_ENGAGE_UNIT" then
+        SG:Try(scanBosses)
+    elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
         local _, sub, _, _, _, _, _, destGUID = CombatLogGetCurrentEventInfo()
         if sub == "UNIT_DIED" then onDeath(destGUID) end
     elseif event == "UNIT_DIED" then
@@ -111,7 +172,8 @@ local function updateListening()
     local inInstance, kind = IsInInstance()
     local inside = inInstance and (kind == "party" or kind == "raid")
     for _, event in ipairs(DEATH_EVENTS) do
-        if inside then cl:RegisterEvent(event) else cl:UnregisterEvent(event) end
+        -- pcall: si un cliente no tiene alguno de estos eventos, no se rompe nada
+        if inside then pcall(cl.RegisterEvent, cl, event) else pcall(cl.UnregisterEvent, cl, event) end
     end
 end
 SG:On("PLAYER_ENTERING_WORLD", updateListening)

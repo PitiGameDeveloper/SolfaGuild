@@ -58,7 +58,12 @@ local function teamKey(info)
     return table.concat(names, ",")
 end
 
+-- Un asesinato coordinado es de grupo, no de banda: más de 5 no cabe en la ventana
+PvP.MAX_TEAM = 5
+
 local function addTeam(team)
+    local _, commas = team:gsub(",", "")
+    if commas + 1 > PvP.MAX_TEAM then return end
     local c = SG:MyChar()
     SG:CheckWeek(c)
     c.teams[team] = (c.teams[team] or 0) + 1
@@ -324,7 +329,7 @@ function PvP:Zones(week)
     return arr
 end
 
--- Asesinatos coordinados: equipos de 2 o más cuentas, de más a menos kills.
+-- Asesinatos coordinados: equipos de 2 a 5 cuentas, de más a menos kills.
 -- Cada participante apunta el mismo asesinato, así que por equipo se toma el
 -- mayor de lo que dice cada uno (no se suman).
 function PvP:Teams(week)
@@ -343,7 +348,7 @@ function PvP:Teams(week)
                     local id = charToAcc[name]
                     if id and not seen[id] then seen[id] = true; ids[#ids + 1] = id end
                 end
-                if #ids >= 2 then
+                if #ids >= 2 and #ids <= PvP.MAX_TEAM then
                     table.sort(ids)
                     local akey = table.concat(ids, ",")
                     mine[akey] = mine[akey] or { ids = ids, kills = 0 }

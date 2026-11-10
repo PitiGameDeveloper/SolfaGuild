@@ -200,7 +200,8 @@ local function pvpRows(week)
     blank()
     rows[#rows + 1] = { text = "Zonas más sangrientas", header = true }
     local zones = SG.PvP:Zones(week)
-    for _, z in ipairs(zones) do
+    for i, z in ipairs(zones) do
+        if i > 5 then break end
         rows[#rows + 1] = { text = z.zone }
         rows[#rows + 1] = { text = INDENT .. num(z.kills) .. " " .. SKULL }
     end
