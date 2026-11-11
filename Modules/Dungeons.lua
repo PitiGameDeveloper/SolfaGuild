@@ -129,16 +129,21 @@ local function onEncounterEnd(id, name, _, _, success)
     scanBosses()
     local d = fight and fight.d
     fight = nil
-    SG:Debug("Fin de encuentro:", tostring(id), tostring(name), "bien:", tostring(success), "mazmorra:", d and d.id or "?")
-    if not (success == 1 or success == true) then return end
-    -- si el jefe no salía como boss1..5, quizá lo tienes en el objetivo
+    if not (success == 1 or success == true) then
+        SG:Debug("Fin de encuentro:", tostring(id), tostring(name), "bien:", tostring(success))
+        return
+    end
+    -- si el jefe no salía como boss1..5, quizá lo tienes en el objetivo; si no, por el
+    -- nombre del encuentro (dentro de Forever no suele haber otra cosa)
     d = d or dungeonOfUnit("target")
+    if not d and type(name) == "string" then d = SG.DungeonByFinalName[name:lower()] end
     local known = id and encounters()[id]
     if d then
         if id then encounters()[id] = d.id end
     elseif known then
         d = SG.DungeonById[known]
     end
+    SG:Debug("Fin de encuentro:", tostring(id), tostring(name), "bien:", tostring(success), "mazmorra:", d and d.id or "?")
     if d then SG:Try(D.Complete, D, d) end
 end
 

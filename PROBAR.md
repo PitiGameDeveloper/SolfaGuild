@@ -64,10 +64,12 @@ Antes de empezar, activa `/sg debug`: enseña en el chat cada muerte honorable. 
 
 ## 6. Mazmorras (`Data/Dungeons.lua`)
 - [ ] Al morir el jefe final dentro, la mazmorra cuenta **una vez** (`UNIT_DIED`, `PARTY_KILL`; `IsInInstance()` debe devolver `party` o `raid`).
-- [ ] **Sin `UNIT_DIED` no contaba ninguna** (11-nov: listas vacías en Forever). Ahora se mira el fin del encuentro (`ENCOUNTER_END` con éxito)
-  y si el jefe final salía como `boss1..5` o en el objetivo. Con `/sg debug` sale "Fin de encuentro: id, nombre, bien, mazmorra" al
-  matar cada jefe: comprobar que el final da su mazmorra (no "?"). Si sale "?", ni `boss1` ni el objetivo dan el GUID: hay que
-  apuntar a mano los identificadores de encuentro de cada mazmorra (`SolfaGuildDB.encounters` guarda los que ya se conocen).
+- [ ] **Sin `UNIT_DIED` no contaba ninguna** (11-nov: listas vacías en Forever). Luego, con `ENCOUNTER_END` y el jefe en `boss1..5`
+  o en el objetivo, **tampoco** (11-nov): dentro no hay `boss1` y el objetivo no da el GUID. Ahora el jefe final se reconoce por el
+  **nombre del encuentro** (`FINAL_NAMES` en `Data/Dungeons.lua`, en español y en inglés). Con `/sg debug` sale
+  "Fin de encuentro: id, nombre, bien, mazmorra" al matar cada jefe: comprobar que el final da su mazmorra (no "?"). Si sale "?",
+  apuntar el nombre exacto que sale y añadirlo a `FINAL_NAMES`. Los nombres en español son de AtlasLoot/ForeverDungeonJournal; los
+  menos seguros: *Durgen Martillo Funesto/Fúnebre*, *Señor supremo Vermiothalak*, y Krol'dok y Faucenegra, que aún no tienen ninguno.
 - [ ] **Aviso de primera mazmorra**: al subir al nivel de la primera mazmorra (el `min` más bajo de `Data/Dungeons.lua`, ahora 13) sale la carta con su título entero en la ventana (`PLAYER_LEVEL_UP` debe dar el nivel), y **Ver PvE** abre la pestaña PvE. Comprobar que ese nivel es de verdad el mínimo para entrar.
 - [ ] **Mazmorras más completadas y grupos**: los Solfamidas que van juntos suman **una** completación y salen como grupo; por separado, una cada uno. Comprobar que dentro de la instancia el juego da los nombres del grupo (`UnitName`, sin valores ocultos); si no, cuentan por separado. Quien está en el grupo pero fuera de la instancia también sale en el grupo.
 - [ ] **Niveles**: las guías no coinciden. Las 6 de la captura van con sus niveles y las demás con los de AtlasLootClassic y NeedRoll. Se usa un solo rango; el nivel real para entrar suele ser menor.

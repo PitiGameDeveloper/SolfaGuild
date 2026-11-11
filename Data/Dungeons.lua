@@ -2,7 +2,7 @@
 -- id: no cambiarlo (es la clave de lo ya completado por cada personaje).
 -- min/max: rango de nivel. Por debajo de min no se puede pedir ni recibir el LFS.
 -- bosses: NPC IDs del jefe final (al morir dentro de la instancia cuenta como
--- completada). Vacío = aún no se sabe, así que esa mazmorra no se marca nunca.
+-- completada). También cuenta por el nombre del encuentro (FINAL_NAMES, más abajo).
 -- color: fondo de la tarjeta si no hay imagen (ver LOADING_SCREEN, más abajo).
 -- >>> Niveles, nombres y jefes por confirmar: ver PROBAR.md <<<
 
@@ -59,12 +59,54 @@ local LOADING_SCREEN = {
     dme = 131835, dmw = 131835, dmn = 131835, stratl = 131871, stratu = 131871, scholo = 131868,
 }
 
+-- Nombre del encuentro del jefe final, como lo da ENCOUNTER_END (en español y en inglés).
+-- Dentro de las mazmorras de Forever no hay boss1..5 y el GUID del objetivo puede venir
+-- oculto, así que el nombre es lo único seguro. Se comparan en minúsculas.
+-- Español: AtlasLootClassic y ForeverDungeonJournal; inglés: MuddyBoots. Ver PROBAR.md.
+local FINAL_NAMES = {
+    rfc = { "Bazzalan", "Taragaman el Hambriento", "Taragaman the Hungerer" },
+    thanes = { "Durgen Martillo Funesto", "Durgen Martillo Fúnebre", "Durgen Dirgehammer" },
+    ruins = { "Rath'mael" },
+    wc = { "Mutanus el Devorador", "Mutanus the Devourer" },
+    vc = { "Edwin VanCleef" },
+    sfk = { "Archimago Arugal", "Archmage Arugal" },
+    bfd = { "Aku'mai" },
+    stocks = { "Bazil Thredd" },
+    excav = { "Guardián de reliquias", "Relic Guardian" },
+    dalaran = { "Lyn el Ignorado", "Lyn the Ignored", "Sombra del archimago", "Shade of the Archmage" },
+    gnomer = { "Mekigeniero Termochufe", "Mekgineer Thermaplugg" },
+    rfk = { "Charlga Filonavaja", "Charlga Razorflank" },
+    smgy = { "Mago sangriento Thalnos", "Bloodmage Thalnos" },
+    smlib = { "Arcanista Doan", "Arcanist Doan" },
+    smarm = { "Herod" },
+    smcath = { "Alta inquisidora Melenablanca", "High Inquisitor Whitemane", "Comandante Escarlata Mograine", "Scarlet Commander Mograine" },
+    drowned = { "Min'Loth" },
+    rfd = { "Amnennar el Gélido", "Amnennar the Coldbringer" },
+    ulda = { "Archaedas" },
+    zf = { "Jefe Ukorz Cabellarena", "Chief Ukorz Sandscalp" },
+    mara = { "Princesa Theradras", "Princess Theradras" },
+    alcaz = { "Blazeroar" },
+    st = { "Sombra de Eranikus", "Shade of Eranikus" },
+    brd = { "Emperador Dagran Thaurissan", "Emperor Dagran Thaurissan" },
+    lbrs = { "Señor supremo Vermiothalak", "Overlord Wyrmthalak" },
+    ubrs = { "General Drakkisath" },
+    dme = { "Alzzin el Formaferal", "Alzzin the Wildshaper" },
+    dmw = { "Príncipe Tortheldrin", "Prince Tortheldrin" },
+    dmn = { "Rey Gordok", "King Gordok" },
+    shaper = { "Nanaya" },
+    stratl = { "Balnazzar" },
+    stratu = { "Barón Osahendido", "Baron Rivendare" },
+    scholo = { "Maestro oscuro Gandling", "Darkmaster Gandling" },
+}
+
 SG.DungeonById = {}
 SG.DungeonByBoss = {}
+SG.DungeonByFinalName = {}
 for _, d in ipairs(SG.Dungeons) do
     d.art = LOADING_SCREEN[d.id]
     SG.DungeonById[d.id] = d
     for _, npc in ipairs(d.bosses) do SG.DungeonByBoss[npc] = d end
+    for _, name in ipairs(FINAL_NAMES[d.id] or {}) do SG.DungeonByFinalName[name:lower()] = d end
 end
 
 -- Funciones que puede hacer cada clase. Una clase que no esté aquí solo hace DPS.

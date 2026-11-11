@@ -29,7 +29,8 @@
   otras vías: `UNIT_DIED`, `PARTY_KILL`, muertes honorables y `C_DeathRecap` (ver `Modules/PvP.lua` y
   `Modules/CampSOS.lua`), hechizos propios (`UNIT_SPELLCAST_*`) y `C_DamageMeter` para curación y daño, como Details
   (`Modules/Cositas.lua`; sus valores están ocultos en combate, se leen al salir). Las mazmorras se
-  cuentan con `ENCOUNTER_START`/`ENCOUNTER_END` (jefe final en `boss1..5` u objetivo), porque `UNIT_DIED` no daba nada dentro.
+  cuentan con `ENCOUNTER_START`/`ENCOUNTER_END` (el jefe final por el nombre del encuentro, `FINAL_NAMES` en `Data/Dungeons.lua`), porque dentro no salen `UNIT_DIED`,
+  `boss1..5` ni el GUID del objetivo.
 - **PvP en Forever: decisión del GM.** Solo cuentan las muertes honorables. Un asesinato coordinado es que varios
   Solfamidas avisen de una muerte honorable con el mismo identificador del muerto (`UNIT_DIED`/`PARTY_KILL`); si falta,
   misma zona a la vez y mismo grupo u objetivo. Eso nunca suma asesinatos. Un equipo es de 2 a 5 (`PvP.MAX_TEAM`): los de
