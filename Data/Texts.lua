@@ -89,7 +89,7 @@ T.firstDungeon = {
 ---------------------------------------------------------------------------
 -- COSITAS: categorías de la pestaña "Cositas" (sale solo el mejor de cada una;
 -- la descripción se ve al pasar el ratón). key = dato que se cuenta (no tocar),
--- time = se muestra como tiempo, money = como oro. Se pueden reordenar, renombrar o quitar.
+-- time = se muestra como tiempo, money = como oro, avg = media con un decimal. Se pueden reordenar, renombrar o quitar.
 ---------------------------------------------------------------------------
 T.cositas = {
     { key = "fish",      title = "Nat Pagle",          desc = "Peces pescados" },
@@ -113,6 +113,7 @@ T.cositas = {
     { key = "inspect",   title = "Stalker",            desc = "Veces que ha inspeccionado a otros jugadores" },
     { key = "rolls",     title = "Ludópata",           desc = "/roll tirados" },
     { key = "need",      title = "Ninja",              desc = "Veces que ha elegido Necesidad al repartir botín" },
+    { key = "rollAvg",   title = "Potra",              desc = "La media más alta en las tiradas de /roll (de 1 a 100), Necesidad y Codicia. Hacen falta al menos 20 tiradas", avg = true },
     { key = "rez",       title = "Ángel de la guarda", desc = "Resurrecciones lanzadas a otros jugadores" },
     { key = "heal",      title = "Sorakambulancia",    desc = "Curación hecha" },
     { key = "mail",      title = "Cartero",            desc = "Correos enviados" },

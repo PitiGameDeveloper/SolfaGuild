@@ -95,6 +95,45 @@ local DUEL_LINES = {
     duelLine(DUEL_WINNER_RETREAT, true),
 }
 
+-- Línea con argumentos que el idioma puede reordenar ("%2$d"): devuelve el patrón y, para
+-- cada captura, a qué argumento del texto original corresponde.
+local function argLine(fmt)
+    local pattern = toPattern(fmt)
+    if not pattern then return nil end
+    local order, n = {}, 0
+    for pos in fmt:gmatch("%%(%d*)%$?[sd]") do
+        n = n + 1
+        order[n] = tonumber(pos) or n
+    end
+    return { pattern = pattern, order = order }
+end
+
+local function argsOf(line, msg)
+    if not line then return nil end
+    local caps = { msg:match(line.pattern) }
+    if not caps[1] then return nil end
+    local args = {}
+    for i, v in ipairs(caps) do args[line.order[i]] = v end
+    return args
+end
+
+-- Tiradas para "Potra": /roll (nombre, tirada, mínimo, máximo) y el reparto de botín
+-- (tirada, objeto, nombre). Solo cuentan las de 1 a 100, que son las que se pueden comparar.
+local ROLL_LINE = argLine(RANDOM_ROLL_RESULT)
+local LOOT_ROLL_LINES = {}
+-- por nombre: si una cadena no existe en este cliente, se salta sin cortar la lista
+for _, name in ipairs({ "LOOT_ROLL_ROLLED_NEED_ROLE_BONUS", "LOOT_ROLL_ROLLED_NEED", "LOOT_ROLL_ROLLED_GREED" }) do
+    LOOT_ROLL_LINES[#LOOT_ROLL_LINES + 1] = argLine(_G[name])
+end
+Cos.MIN_ROLLS = 20     -- tiradas que hacen falta para salir en la clasificación
+
+local function addRoll(n)
+    n = tonumber(n)
+    if not n or n < 1 or n > 100 then return end
+    add("rollSum", n)
+    add("rollCount")
+end
+
 ---------------------------------------------------------------------------
 -- Registro de combate (solo lo tuyo)
 ---------------------------------------------------------------------------
@@ -230,6 +269,21 @@ SG:On("CHAT_MSG_SYSTEM", function(msg)
     if type(msg) ~= "string" then return end
     if AUCTION_WON and msg:match(AUCTION_WON) then add("ah") end
     onDuelLine(msg)
+    local roll = argsOf(ROLL_LINE, msg)
+    if roll and isMe(roll[1]) and tonumber(roll[3]) == 1 and tonumber(roll[4]) == 100 then addRoll(roll[2]) end
+end)
+
+-- Potra: las tiradas de Necesidad y Codicia del reparto de botín, solo las mías
+SG:On("CHAT_MSG_LOOT", function(msg)
+    msg = SG:Open(msg)
+    if type(msg) ~= "string" then return end
+    for _, line in ipairs(LOOT_ROLL_LINES) do
+        local args = argsOf(line, msg)
+        if args then
+            if args[3] and isMe(args[3]) then addRoll(args[1]) end
+            return
+        end
+    end
 end)
 
 ---------------------------------------------------------------------------
@@ -607,6 +661,10 @@ end
 -- más larga es la mayor de todos ellos)
 function Cos:Value(acc, key)
     if key == "played" or key == "earned" then return SG:AccountSum(acc, key) end
+    if key == "rollAvg" then
+        local count = self:Value(acc, "rollCount")
+        return count > 0 and self:Value(acc, "rollSum") / count or 0, count
+    end
     local total = 0
     for _, c in pairs(acc.chars or {}) do
         local v = type(c.cositas) == "table" and tonumber(c.cositas[key]) or 0
@@ -626,9 +684,11 @@ function Cos:Board()
     for _, cat in ipairs(SG.Texts.cositas) do
         local best, mine = nil, 0
         for _, acc in pairs(accounts) do
-            local v = self:Value(acc, cat.key)
+            local v, count = self:Value(acc, cat.key)
             if acc.mine then mine = v end
-            if v > 0 and (not best or v > best.value) then best = { acc = acc, value = v } end
+            -- una media con pocas tiradas no vale: con una sola de 100 se ganaría
+            local enough = not cat.avg or (count or 0) >= self.MIN_ROLLS
+            if v > 0 and enough and (not best or v > best.value) then best = { acc = acc, value = v } end
         end
         out[#out + 1] = { cat = cat, best = best, mine = mine }
     end

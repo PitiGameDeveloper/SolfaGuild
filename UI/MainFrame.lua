@@ -32,6 +32,7 @@ local function you(acc) return acc.mine and " |cff88ff88(tú)|r" or "" end
 local function cosValue(cat, v)
     if cat.money then return SG:FormatMoney(v, true) end
     if cat.time then return "|cffffffff" .. SG:FormatTime(v, true) .. "|r" end
+    if cat.avg then return "|cffffffff" .. string.format("%.1f", v or 0):gsub("%.", ",") .. "|r" end
     return num(v)
 end
 

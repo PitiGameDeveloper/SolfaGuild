@@ -330,6 +330,9 @@ GetSpellInfo = function(id) return "Hechizo" .. tostring(id) end
 RandomRoll = function() end
 DUEL_WINNER_KNOCKOUT = "%1$s has defeated %2$s in a duel"
 DUEL_WINNER_RETREAT = "%2$s has fled from %1$s in a duel"
+RANDOM_ROLL_RESULT = "%s rolls %d (%d-%d)"
+LOOT_ROLL_ROLLED_NEED = "Need Roll - %d for %s by %s"
+LOOT_ROLL_ROLLED_GREED = "Greed Roll - %d for %s by %s"
 InspectUnit = function() end
 -- como en Forever: una envoltura antigua que llama a la función nueva
 DoEmote = function(token, target) return C_ChatInfo.PerformEmote(token, target) end
