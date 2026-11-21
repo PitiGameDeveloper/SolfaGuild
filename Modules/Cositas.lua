@@ -184,7 +184,7 @@ local function groupMateDead()
     local prefix = (IsInRaid and IsInRaid()) and "raid" or "party"
     for i = 1, n do
         local u = prefix .. i
-        if UnitExists(u) and not UnitIsUnit(u, "player") and UnitIsDeadOrGhost(u) then return true end
+        if SG:Open(UnitExists(u)) and not SG:Open(UnitIsUnit(u, "player")) and SG:Open(UnitIsDeadOrGhost(u)) then return true end
     end
     return false
 end
@@ -569,13 +569,14 @@ local function tick()
     local len = now - c.sessionStart
     if len > (stats.session or 0) then stats.session = len end
 
-    local afk = UnitIsAFK("player")
+    -- En Forever estos valores pueden venir ocultos: SG:Open los deja en nil
+    local afk = SG:Open(UnitIsAFK("player")) and true or false
     if not SG.HasCombatLog then forgetRezzed(GetTime()) end
     moveTick(afk)
-    if not afk and IsSwimming() then add("swim", TICK) end
+    if not afk and SG:Open(IsSwimming()) then add("swim", TICK) end
     if not afk and inEnemyLand() then add("enemyLand", TICK) end
     tickOrgrimmar()
-    if UnitIsGhost("player") then add("ghost", TICK) end
+    if SG:Open(UnitIsGhost("player")) then add("ghost", TICK) end
     if inGroup() then add("group", TICK) end
 end
 
@@ -631,7 +632,7 @@ function Cos:OnLogin()
     end
 
     hook("JumpOrAscendStart", function()
-        if not IsSwimming() and not (IsFlying and IsFlying()) then add("jumps") end
+        if not SG:Open(IsSwimming()) and not SG:Open(IsFlying and IsFlying()) then add("jumps") end
     end)
     hook("RandomRoll", function() addLimited("rolls") end)
     hook("RollOnLoot", function(_, rollType) if rollType == LOOT_NEED then add("need") end end)
